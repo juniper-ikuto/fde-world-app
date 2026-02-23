@@ -20,8 +20,9 @@ async function getDb(): Promise<SqlJsDatabase> {
   if (db) return db;
 
   const SQL = await initSqlJs();
-  const buffer = fs.readFileSync(DB_PATH);
-  db = new SQL.Database(buffer);
+  // Start with empty DB if file doesn't exist yet (first deploy before sync)
+  const buffer = fs.existsSync(DB_PATH) ? fs.readFileSync(DB_PATH) : undefined;
+  db = buffer ? new SQL.Database(buffer) : new SQL.Database();
 
   // Create candidate tables if they don't exist
   db.run(`
