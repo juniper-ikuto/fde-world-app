@@ -11,7 +11,10 @@ import {
   Link,
 } from "@react-email/components";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy init — env vars only available at request time, not build time
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -155,7 +158,7 @@ export async function sendMagicLink(
   token: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: "FDE World <noreply@fdeworld.com>",
       to: email,
       subject: "Sign in to FDE World",
