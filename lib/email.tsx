@@ -159,7 +159,7 @@ export async function sendMagicLink(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await getResend().emails.send({
-      from: "FDE World <noreply@fdeworld.com>",
+      from: "FDE World <onboarding@resend.dev>",
       to: email,
       subject: "Sign in to FDE World",
       react: MagicLinkEmail({ name, token }),
