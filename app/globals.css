@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #FAFAFA;
+  --bg-secondary: #F4F4F5;
+  --bg-elevated: #FFFFFF;
+  --text-primary: #09090B;
+  --text-secondary: #71717A;
+  --text-tertiary: #A1A1AA;
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-light: #EEF2FF;
+  --border: #E4E4E7;
+  --border-hover: #D4D4D8;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --destructive: #EF4444;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+@layer base {
+  input, textarea, select {
+    @apply outline-none;
+  }
+
+  ::selection {
+    background-color: var(--accent-light);
+    color: var(--accent);
+  }
+}
+
+@layer components {
+  .skeleton {
+    @apply bg-bg-secondary rounded-md;
+    background: linear-gradient(
+      90deg,
+      #F4F4F5 0%,
+      #E4E4E7 50%,
+      #F4F4F5 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Prose styling for job description drawer */
+.prose-drawer p {
+  margin-bottom: 0.75em;
+}
+.prose-drawer h2, .prose-drawer h3, .prose-drawer h4 {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-size: 0.875rem;
+}
+.prose-drawer ul, .prose-drawer ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+.prose-drawer li {
+  margin-bottom: 0.25em;
+  list-style-type: disc;
+}
+.prose-drawer ol li {
+  list-style-type: decimal;
+}
+.prose-drawer a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.prose-drawer a:hover {
+  color: var(--accent-hover);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
