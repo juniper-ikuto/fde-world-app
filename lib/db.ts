@@ -586,6 +586,43 @@ export async function verifyCandidate(token: string): Promise<Candidate | null> 
   return { ...c, verified: 1 };
 }
 
+export async function updateCandidate(
+  id: number,
+  fields: { name?: string; role_types?: string; remote_pref?: string; alert_freq?: string }
+): Promise<void> {
+  const database = await getDb();
+  const sets: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (fields.name !== undefined) { sets.push("name = ?"); params.push(fields.name); }
+  if (fields.role_types !== undefined) { sets.push("role_types = ?"); params.push(fields.role_types); }
+  if (fields.remote_pref !== undefined) { sets.push("remote_pref = ?"); params.push(fields.remote_pref); }
+  if (fields.alert_freq !== undefined) { sets.push("alert_freq = ?"); params.push(fields.alert_freq); }
+
+  if (sets.length === 0) return;
+
+  sets.push("last_active_at = datetime('now')");
+  params.push(id);
+  database.run(`UPDATE candidates SET ${sets.join(", ")} WHERE id = ?`, params);
+  forceSave();
+}
+
+export async function deleteCandidate(id: number): Promise<void> {
+  const database = await getDb();
+  database.run("DELETE FROM candidate_saved_jobs WHERE candidate_id = ?", [id]);
+  database.run("DELETE FROM candidates WHERE id = ?", [id]);
+  forceSave();
+}
+
+export async function getSavedJobCount(candidateId: number): Promise<number> {
+  const database = await getDb();
+  const result = database.exec(
+    "SELECT COUNT(*) FROM candidate_saved_jobs WHERE candidate_id = ?",
+    [candidateId]
+  );
+  return result.length > 0 ? (result[0].values[0][0] as number) : 0;
+}
+
 // ── Saved jobs ──
 
 export async function getSavedJobUrls(

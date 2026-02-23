@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, SearchX } from "lucide-react";
 import Nav from "@/components/Nav";
 import JobCard, { JobCardSkeleton } from "@/components/JobCard";
@@ -27,6 +27,7 @@ interface CandidateInfo {
 
 function FeedContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialRole = searchParams.get("role");
 
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -49,24 +50,24 @@ function FeedContent() {
     companies: [],
   });
 
-  // Check auth and load saved jobs
+  // Check auth and load saved jobs — redirect if not signed in
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const res = await fetch("/api/saved");
-        if (res.ok) {
-          const data = await res.json();
-          setSavedUrls(new Set(data.savedUrls));
-          // Candidate info would come from a profile endpoint, but for now
-          // we just know they're authenticated if the saved endpoint works
-          setCandidate({ id: 0, name: null, email: "" });
+        if (!res.ok) {
+          router.push("/signup");
+          return;
         }
+        const data = await res.json();
+        setSavedUrls(new Set(data.savedUrls));
+        setCandidate({ id: 0, name: null, email: "" });
       } catch {
-        // Not authenticated — that's fine, feed still works
+        router.push("/signup");
       }
     };
     checkAuth();
-  }, []);
+  }, [router]);
 
   // Fetch jobs
   const fetchJobs = useCallback(

@@ -219,8 +219,7 @@ export default async function LandingPage() {
                   href="/signup"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-medium text-base rounded-md transition-colors duration-150"
                 >
-                  Sign up to see all {stats.openJobs.toLocaleString()} open
-                  roles
+                  Join to see all {stats.openJobs.toLocaleString()} roles
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>

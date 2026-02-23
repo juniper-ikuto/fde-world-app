@@ -54,18 +54,32 @@ export default function Nav({ candidate }: NavProps) {
           </Link>
 
           {isAuthenticated && (
-            <Link
-              href="/saved"
-              className={cn(
-                "px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5",
-                pathname === "/saved"
-                  ? "text-text-primary bg-bg-secondary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
-              )}
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              Saved
-            </Link>
+            <>
+              <Link
+                href="/saved"
+                className={cn(
+                  "px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5",
+                  pathname === "/saved"
+                    ? "text-text-primary bg-bg-secondary"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+                )}
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                Saved
+              </Link>
+              <Link
+                href="/account"
+                className={cn(
+                  "px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5",
+                  pathname === "/account"
+                    ? "text-text-primary bg-bg-secondary"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+                )}
+              >
+                <User className="w-3.5 h-3.5" />
+                Account
+              </Link>
+            </>
           )}
         </div>
 
@@ -114,7 +128,7 @@ export default function Nav({ candidate }: NavProps) {
           ) : (
             <>
               <Link
-                href="/signup"
+                href="/auth"
                 className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
               >
                 Sign in
@@ -123,7 +137,7 @@ export default function Nav({ candidate }: NavProps) {
                 href="/signup"
                 className="text-sm font-medium text-white bg-accent hover:bg-accent-hover px-4 py-1.5 rounded-md transition-colors duration-150"
               >
-                Sign up
+                Join free
               </Link>
             </>
           )}
@@ -155,13 +169,22 @@ export default function Nav({ candidate }: NavProps) {
             </Link>
 
             {isAuthenticated && (
-              <Link
-                href="/saved"
-                onClick={() => setMobileOpen(false)}
-                className="block px-3 py-2 text-sm rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
-              >
-                Saved Jobs
-              </Link>
+              <>
+                <Link
+                  href="/saved"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-3 py-2 text-sm rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+                >
+                  Saved Jobs
+                </Link>
+                <Link
+                  href="/account"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-3 py-2 text-sm rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+                >
+                  Account
+                </Link>
+              </>
             )}
 
             <div className="pt-2 border-t border-border mt-2">
@@ -177,13 +200,22 @@ export default function Nav({ candidate }: NavProps) {
                   Sign out
                 </button>
               ) : (
-                <Link
-                  href="/signup"
-                  onClick={() => setMobileOpen(false)}
-                  className="block px-3 py-2 text-sm font-medium text-accent"
-                >
-                  Sign up →
-                </Link>
+                <>
+                  <Link
+                    href="/auth"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2 text-sm text-text-secondary hover:text-text-primary"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/signup"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2 text-sm font-medium text-accent"
+                  >
+                    Join free →
+                  </Link>
+                </>
               )}
             </div>
           </div>
