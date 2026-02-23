@@ -19,6 +19,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -65,6 +66,10 @@ export default function SignupPage() {
       formData.append("email", email.trim().toLowerCase());
       formData.append("name", name.trim());
       formData.append("roleTypes", JSON.stringify(selectedRoles));
+
+      if (location.trim()) {
+        formData.append("location", location.trim());
+      }
 
       if (linkedinUrl.trim()) {
         formData.append("linkedin_url", linkedinUrl.trim());
@@ -153,6 +158,25 @@ export default function SignupPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Jane"
+                  className="w-full h-10 px-3 text-sm bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all duration-150"
+                />
+              </div>
+
+              {/* Location (optional) */}
+              <div>
+                <label
+                  htmlFor="location"
+                  className="block text-sm font-medium text-text-primary mb-1.5"
+                >
+                  Where are you based?{" "}
+                  <span className="text-text-tertiary font-normal">(optional)</span>
+                </label>
+                <input
+                  id="location"
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. London, UK"
                   className="w-full h-10 px-3 text-sm bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all duration-150"
                 />
               </div>

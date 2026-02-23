@@ -42,20 +42,45 @@ async function getDb(): Promise<SqlJsDatabase> {
       verification_token TEXT,
       token_expires_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
-      last_active_at TEXT
+      last_active_at TEXT,
+      linkedin_url TEXT,
+      linkedin_verified INTEGER DEFAULT 0,
+      linkedin_id TEXT,
+      avatar_url TEXT,
+      current_role TEXT,
+      current_company TEXT,
+      years_experience INTEGER,
+      skills TEXT,
+      open_to_work TEXT DEFAULT 'active',
+      work_auth TEXT,
+      notice_period TEXT,
+      salary_min INTEGER,
+      salary_currency TEXT DEFAULT 'GBP',
+      cv_filename TEXT,
+      cv_path TEXT
     )
   `);
 
-  // Migrate: add linkedin/cv columns if they don't exist
-  try {
-    db.run("ALTER TABLE candidates ADD COLUMN linkedin_url TEXT");
-  } catch { /* column already exists */ }
-  try {
-    db.run("ALTER TABLE candidates ADD COLUMN cv_filename TEXT");
-  } catch { /* column already exists */ }
-  try {
-    db.run("ALTER TABLE candidates ADD COLUMN cv_path TEXT");
-  } catch { /* column already exists */ }
+  // Migrate: add columns if they don't exist
+  for (const col of [
+    "ALTER TABLE candidates ADD COLUMN linkedin_url TEXT",
+    "ALTER TABLE candidates ADD COLUMN cv_filename TEXT",
+    "ALTER TABLE candidates ADD COLUMN cv_path TEXT",
+    "ALTER TABLE candidates ADD COLUMN linkedin_verified INTEGER DEFAULT 0",
+    "ALTER TABLE candidates ADD COLUMN linkedin_id TEXT",
+    "ALTER TABLE candidates ADD COLUMN avatar_url TEXT",
+    "ALTER TABLE candidates ADD COLUMN current_role TEXT",
+    "ALTER TABLE candidates ADD COLUMN current_company TEXT",
+    "ALTER TABLE candidates ADD COLUMN years_experience INTEGER",
+    "ALTER TABLE candidates ADD COLUMN skills TEXT",
+    "ALTER TABLE candidates ADD COLUMN open_to_work TEXT DEFAULT 'active'",
+    "ALTER TABLE candidates ADD COLUMN work_auth TEXT",
+    "ALTER TABLE candidates ADD COLUMN notice_period TEXT",
+    "ALTER TABLE candidates ADD COLUMN salary_min INTEGER",
+    "ALTER TABLE candidates ADD COLUMN salary_currency TEXT DEFAULT 'GBP'",
+  ]) {
+    try { db.run(col); } catch { /* column already exists */ }
+  }
 
   // Migrate: add featured column to jobs table if it doesn't exist
   try {
@@ -474,6 +499,21 @@ export interface Candidate {
   token_expires_at: string | null;
   created_at: string;
   last_active_at: string | null;
+  linkedin_url: string | null;
+  linkedin_verified: number;
+  linkedin_id: string | null;
+  avatar_url: string | null;
+  current_role: string | null;
+  current_company: string | null;
+  years_experience: number | null;
+  skills: string | null;
+  open_to_work: string | null;
+  work_auth: string | null;
+  notice_period: string | null;
+  salary_min: number | null;
+  salary_currency: string | null;
+  cv_filename: string | null;
+  cv_path: string | null;
 }
 
 export async function upsertCandidate(
@@ -482,7 +522,8 @@ export async function upsertCandidate(
   roleTypes: string[],
   linkedinUrl?: string,
   cvFilename?: string,
-  cvPath?: string
+  cvPath?: string,
+  location?: string
 ): Promise<Candidate> {
   const database = await getDb();
   const roleTypesJson = JSON.stringify(roleTypes);
@@ -495,13 +536,13 @@ export async function upsertCandidate(
 
   if (existing.length > 0 && existing[0].values.length > 0) {
     database.run(
-      "UPDATE candidates SET name = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), last_active_at = datetime('now') WHERE email = ?",
-      [name, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, email]
+      "UPDATE candidates SET name = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), location = COALESCE(?, location), last_active_at = datetime('now') WHERE email = ?",
+      [name, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null, email]
     );
   } else {
     database.run(
-      "INSERT INTO candidates (email, name, role_types, linkedin_url, cv_filename, cv_path) VALUES (?, ?, ?, ?, ?, ?)",
-      [email, name, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null]
+      "INSERT INTO candidates (email, name, role_types, linkedin_url, cv_filename, cv_path, location) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [email, name, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null]
     );
   }
 
@@ -588,16 +629,55 @@ export async function verifyCandidate(token: string): Promise<Candidate | null> 
 
 export async function updateCandidate(
   id: number,
-  fields: { name?: string; role_types?: string; remote_pref?: string; alert_freq?: string }
+  fields: {
+    name?: string;
+    role_types?: string;
+    remote_pref?: string;
+    alert_freq?: string;
+    current_role?: string;
+    current_company?: string;
+    years_experience?: number;
+    skills?: string;
+    open_to_work?: string;
+    location?: string;
+    work_auth?: string;
+    notice_period?: string;
+    salary_min?: number;
+    salary_currency?: string;
+    linkedin_url?: string;
+    linkedin_verified?: number;
+    linkedin_id?: string;
+    avatar_url?: string;
+    cv_filename?: string;
+    cv_path?: string;
+  }
 ): Promise<void> {
   const database = await getDb();
   const sets: string[] = [];
   const params: (string | number)[] = [];
 
-  if (fields.name !== undefined) { sets.push("name = ?"); params.push(fields.name); }
-  if (fields.role_types !== undefined) { sets.push("role_types = ?"); params.push(fields.role_types); }
-  if (fields.remote_pref !== undefined) { sets.push("remote_pref = ?"); params.push(fields.remote_pref); }
-  if (fields.alert_freq !== undefined) { sets.push("alert_freq = ?"); params.push(fields.alert_freq); }
+  const stringFields = [
+    "name", "role_types", "remote_pref", "alert_freq",
+    "current_role", "current_company", "skills", "open_to_work",
+    "location", "work_auth", "notice_period", "salary_currency",
+    "linkedin_url", "linkedin_id", "avatar_url",
+    "cv_filename", "cv_path",
+  ] as const;
+
+  for (const key of stringFields) {
+    if (fields[key] !== undefined) {
+      sets.push(`${key} = ?`);
+      params.push(fields[key] as string);
+    }
+  }
+
+  const numericFields = ["years_experience", "salary_min", "linkedin_verified"] as const;
+  for (const key of numericFields) {
+    if (fields[key] !== undefined) {
+      sets.push(`${key} = ?`);
+      params.push(fields[key] as number);
+    }
+  }
 
   if (sets.length === 0) return;
 

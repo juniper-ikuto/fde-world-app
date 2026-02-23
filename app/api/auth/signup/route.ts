@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     let linkedinUrl: string | undefined;
     let cvFilename: string | undefined;
     let cvPath: string | undefined;
+    let location: string | undefined;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
       const roleTypesRaw = formData.get("roleTypes") as string;
       roleTypes = roleTypesRaw ? JSON.parse(roleTypesRaw) : [];
       linkedinUrl = (formData.get("linkedin_url") as string) || undefined;
+      location = (formData.get("location") as string) || undefined;
 
       const cvFile = formData.get("cv") as File | null;
       if (cvFile && cvFile.size > 0) {
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       name = body.name || "";
       roleTypes = body.roleTypes || [];
       linkedinUrl = body.linkedin_url || undefined;
+      location = body.location || undefined;
     }
 
     if (!email || !name) {
@@ -92,7 +95,8 @@ export async function POST(request: NextRequest) {
       roleTypes,
       linkedinUrl,
       cvFilename,
-      cvPath
+      cvPath,
+      location
     );
 
     // Generate verification token
