@@ -19,7 +19,10 @@ export { DB_PATH };
 async function getDb(): Promise<SqlJsDatabase> {
   if (db) return db;
 
-  const SQL = await initSqlJs();
+  const SQL = await initSqlJs({
+    // Load WASM from filesystem — works in both dev and production (Railway)
+    locateFile: (file: string) => path.join(process.cwd(), "public", file),
+  });
   // Start with empty DB if file doesn't exist yet (first deploy before sync)
   const buffer = fs.existsSync(DB_PATH) ? fs.readFileSync(DB_PATH) : undefined;
   db = buffer ? new SQL.Database(buffer) : new SQL.Database();
