@@ -65,13 +65,10 @@ export async function POST(request: NextRequest) {
 
         const cols = rows[0].columns.join(", ");
         const placeholders = rows[0].columns.map(() => "?").join(", ");
-        const stmt = railwayDb.prepare(
-          `INSERT OR REPLACE INTO ${table} (${cols}) VALUES (${placeholders})`
-        );
+        const insertSql = `INSERT OR REPLACE INTO ${table} (${cols}) VALUES (${placeholders})`;
         for (const row of rows[0].values) {
-          stmt.run(row as (string | number | null)[]);
+          railwayDb.run(insertSql, row as (string | number | null)[]);
         }
-        stmt.free();
       } catch (e) {
         console.error(`Error syncing table ${table}:`, e);
       }
