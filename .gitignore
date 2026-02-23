@@ -9,3 +9,5 @@ node_modules/
 TASK*.md
 ecosystem.config.js
 check_api.py
+
+tsconfig.tsbuildinfo
