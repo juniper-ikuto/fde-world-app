@@ -21,13 +21,25 @@ export function timeAgo(dateStr: string | null): string {
   return `${diffMonths}mo ago`;
 }
 
-export function isNew(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  return diffHours < 72;
+/** Hot: confirmed posted_date within 48 hours */
+export function isHot(postedDate: string | null): boolean {
+  if (!postedDate) return false;
+  const date = new Date(postedDate);
+  const diffHours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+  return diffHours < 48;
+}
+
+/** New: confirmed posted_date within 7 days */
+export function isNew(postedDate: string | null): boolean {
+  if (!postedDate) return false;
+  const date = new Date(postedDate);
+  const diffHours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+  return diffHours < 168; // 7 days
+}
+
+/** Discovered: no confirmed posted_date (found by scraper but date unknown) */
+export function isDiscovered(postedDate: string | null): boolean {
+  return !postedDate || postedDate.trim() === "";
 }
 
 export function extractDomain(url: string): string | null {

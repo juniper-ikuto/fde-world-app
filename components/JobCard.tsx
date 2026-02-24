@@ -1,7 +1,7 @@
 "use client";
 
 import { Heart, ExternalLink, MapPin } from "lucide-react";
-import { cn, timeAgo, isNew, extractDomain, getSourceLabel, getFundingBadgeColors } from "@/lib/utils";
+import { cn, timeAgo, isHot, isNew, isDiscovered, extractDomain, getSourceLabel, getFundingBadgeColors } from "@/lib/utils";
 import { BetaBadge } from "./BetaBadge";
 import type { Job } from "@/lib/db";
 
@@ -43,7 +43,9 @@ export default function JobCard({
   // Priority: custom career site > Crunchbase domain > nothing (skip ATS domains)
   const domain = companyDomain || job.domain || null;
   const logoUrl = domain ? `/api/logo?domain=${encodeURIComponent(domain)}` : null;
-  const jobIsNew = isNew(job.posted_date) || isNew(job.first_seen_at);
+  const jobIsHot = isHot(job.posted_date);
+  const jobIsNew = !jobIsHot && isNew(job.posted_date);
+  const jobIsDiscovered = isDiscovered(job.posted_date);
   const postedAgo = timeAgo(job.posted_date || job.first_seen_at);
   const fundingColors = getFundingBadgeColors(job.funding_stage || null);
   const sourceLabel = getSourceLabel(job.source);
@@ -164,10 +166,20 @@ export default function JobCard({
 
           {/* Badges row */}
           <div className="flex flex-wrap items-center gap-2 mt-3">
+            {jobIsHot && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-orange-700 bg-orange-50 rounded-full border border-orange-200">
+                🔥 Hot
+              </span>
+            )}
             {jobIsNew && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-success bg-success/10 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse-dot" />
-                NEW
+                New
+              </span>
+            )}
+            {jobIsDiscovered && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-text-tertiary bg-bg-secondary rounded-full">
+                🔍 Discovered
               </span>
             )}
 

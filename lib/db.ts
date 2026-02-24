@@ -187,6 +187,7 @@ interface GetJobsParams {
   search?: string;
   excludeCompanies?: string[];
   includeCompanies?: string[];
+  freshness?: string[]; // "hot" | "new" | "discovered"
 }
 
 export async function getJobs(params: GetJobsParams = {}): Promise<{
@@ -206,6 +207,7 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
     search,
     excludeCompanies = [],
     includeCompanies = [],
+    freshness = [],
   } = params;
 
   const conditions: string[] = ["j.status = 'open'"];
@@ -272,6 +274,27 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
     const placeholders = includeCompanies.map(() => "?").join(", ");
     conditions.push(`j.company IN (${placeholders})`);
     includeCompanies.forEach((c) => bindParams.push(c));
+  }
+
+  // Freshness filter (OR across selected options)
+  if (freshness.length > 0) {
+    const freshClauses: string[] = [];
+    if (freshness.includes("hot")) {
+      freshClauses.push(
+        "(j.posted_date IS NOT NULL AND j.posted_date != '' AND j.posted_date >= datetime('now', '-2 days'))"
+      );
+    }
+    if (freshness.includes("new")) {
+      freshClauses.push(
+        "(j.posted_date IS NOT NULL AND j.posted_date != '' AND j.posted_date >= datetime('now', '-7 days'))"
+      );
+    }
+    if (freshness.includes("discovered")) {
+      freshClauses.push("(j.posted_date IS NULL OR j.posted_date = '')");
+    }
+    if (freshClauses.length > 0) {
+      conditions.push(`(${freshClauses.join(" OR ")})`);
+    }
   }
 
   const whereClause = conditions.join(" AND ");

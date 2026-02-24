@@ -17,6 +17,7 @@ interface Filters {
   salaryOnly: boolean;
   sort: "posted" | "discovered";
   companies: string[];
+  freshness: string[];
 }
 
 function FeedContent() {
@@ -42,6 +43,7 @@ function FeedContent() {
     salaryOnly: false,
     sort: "posted",
     companies: [],
+    freshness: [],
   });
 
   // Check auth and load saved jobs — redirect if not signed in
@@ -84,6 +86,8 @@ function FeedContent() {
         if (filters.salaryOnly) params.set("salaryOnly", "true");
         if (filters.companies.length > 0)
           params.set("excludeCompanies", filters.companies.join(","));
+        if (filters.freshness.length > 0)
+          params.set("freshness", filters.freshness.join(","));
         params.set("sort", filters.sort);
         params.set("page", pageNum.toString());
         params.set("limit", "20");
@@ -160,6 +164,7 @@ function FeedContent() {
     filters.countries.length +
     filters.stages.length +
     filters.companies.length +
+    filters.freshness.length +
     (filters.remote ? 1 : 0) +
     (filters.salaryOnly ? 1 : 0);
 

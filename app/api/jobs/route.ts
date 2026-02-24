@@ -20,6 +20,9 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
     const search = searchParams.get("search") || undefined;
+    const freshness = searchParams.get("freshness")
+      ? searchParams.get("freshness")!.split(",")
+      : [];
     const excludeCompaniesRaw = searchParams.get("excludeCompanies")
       ? searchParams.get("excludeCompanies")!.split(",")
       : [];
@@ -48,6 +51,7 @@ export async function GET(request: NextRequest) {
       search,
       excludeCompanies,
       includeCompanies,
+      freshness,
     });
 
     return NextResponse.json(result);

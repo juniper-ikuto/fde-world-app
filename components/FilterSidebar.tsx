@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, SlidersHorizontal, X, Search } from "lucide-react";
+import { ChevronDown, SlidersHorizontal, X, Search, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ROLE_LABELS } from "@/lib/db";
 import { BetaBadge } from "./BetaBadge";
@@ -14,6 +14,18 @@ interface Filters {
   salaryOnly: boolean;
   sort: "posted" | "discovered";
   companies: string[];
+  freshness: string[];
+}
+
+function Tooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1">
+      <Info className="w-3 h-3 text-text-tertiary cursor-help" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 px-2.5 py-1.5 rounded-md bg-text-primary text-bg-primary text-xs leading-snug opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-lg">
+        {text}
+      </span>
+    </span>
+  );
 }
 
 interface FilterSidebarProps {
@@ -182,10 +194,18 @@ export default function FilterSidebar({
     }
   };
 
+  const toggleFreshness = (value: string) => {
+    const next = filters.freshness.includes(value)
+      ? filters.freshness.filter((f) => f !== value)
+      : [...filters.freshness, value];
+    onChange({ ...filters, freshness: next });
+  };
+
   const hasActiveFilters =
     filters.roleTypes.length > 0 ||
     filters.countries.length > 0 ||
     filters.stages.length > 0 ||
+    filters.freshness.length > 0 ||
     filters.remote ||
     filters.salaryOnly ||
     filters.companies.length > 0;
@@ -199,6 +219,7 @@ export default function FilterSidebar({
       salaryOnly: false,
       sort: "posted",
       companies: [],
+      freshness: [],
     });
   };
 
@@ -223,6 +244,52 @@ export default function FilterSidebar({
             </button>
           )}
         </div>
+
+        {/* Freshness */}
+        <FilterSection title="Freshness">
+          {[
+            {
+              value: "hot",
+              label: "🔥 Hot",
+              tooltip: "Posted within the last 48 hours with a confirmed posting date.",
+            },
+            {
+              value: "new",
+              label: "✨ New",
+              tooltip: "Posted within the last 7 days with a confirmed posting date. Includes Hot roles.",
+            },
+            {
+              value: "discovered",
+              label: "🔍 Discovered",
+              tooltip: "Recently found by our scraper, but no confirmed posting date yet. Could be older.",
+            },
+          ].map(({ value, label, tooltip }) => (
+            <label
+              key={value}
+              className="flex items-center gap-2 py-1 cursor-pointer group"
+              onClick={(e) => { e.preventDefault(); toggleFreshness(value); }}
+            >
+              <div
+                className={cn(
+                  "w-4 h-4 rounded-sm border transition-all duration-100 flex items-center justify-center shrink-0",
+                  filters.freshness.includes(value)
+                    ? "bg-accent border-accent"
+                    : "border-border-hover group-hover:border-text-tertiary"
+                )}
+              >
+                {filters.freshness.includes(value) && (
+                  <svg viewBox="0 0 12 12" className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M2 6l3 3 5-5" />
+                  </svg>
+                )}
+              </div>
+              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors duration-100 flex items-center">
+                {label}
+                <Tooltip text={tooltip} />
+              </span>
+            </label>
+          ))}
+        </FilterSection>
 
         {/* Role type */}
         <FilterSection title="Role type">
