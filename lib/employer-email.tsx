@@ -180,7 +180,7 @@ export async function sendAdminNotification(
   try {
     const { error } = await getResend().emails.send({
       from: "FDE World <noreply@fdeworld.com>",
-      to: "dave@ikutogroup.com",
+      to: "david@ikuto.co.uk",
       subject: `New job submission from ${companyName}`,
       react: AdminNotificationEmail({ companyName, jobTitle, jobUrl, submissionId }),
     });
