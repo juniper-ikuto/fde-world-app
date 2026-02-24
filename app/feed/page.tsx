@@ -201,6 +201,9 @@ function FeedContent() {
             {/* Search bar */}
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                {!searchInput && <span className="text-[10px] font-medium text-text-tertiary bg-bg-secondary border border-border px-1.5 py-0.5 rounded">Beta</span>}
+              </span>
               <input
                 ref={searchRef}
                 type="text"
