@@ -254,12 +254,13 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
     );
   }
 
-  // Search
+  // Search — title, company, description snippet (skills often appear here)
   if (search) {
+    const term = `%${search.toLowerCase()}%`;
     conditions.push(
-      "(lower(j.title) LIKE ? OR lower(j.company) LIKE ?)"
+      "(lower(j.title) LIKE ? OR lower(j.company) LIKE ? OR lower(COALESCE(j.description_snippet,'')) LIKE ?)"
     );
-    bindParams.push(`%${search.toLowerCase()}%`, `%${search.toLowerCase()}%`);
+    bindParams.push(term, term, term);
   }
 
   // Company exclusion filter

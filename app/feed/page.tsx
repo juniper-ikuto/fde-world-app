@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Loader2, SearchX } from "lucide-react";
+import { Loader2, SearchX, Search, X } from "lucide-react";
 import Nav from "@/components/Nav";
 import JobCard, { JobCardSkeleton } from "@/components/JobCard";
 import JobDrawer from "@/components/JobDrawer";
@@ -45,6 +45,15 @@ function FeedContent() {
     companies: [],
     freshness: [],
   });
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search input — 350ms
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchInput), 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   // Check auth and load saved jobs — redirect if not signed in
   useEffect(() => {
@@ -88,6 +97,8 @@ function FeedContent() {
           params.set("excludeCompanies", filters.companies.join(","));
         if (filters.freshness.length > 0)
           params.set("freshness", filters.freshness.join(","));
+        if (debouncedSearch.trim())
+          params.set("search", debouncedSearch.trim());
         params.set("sort", filters.sort);
         params.set("page", pageNum.toString());
         params.set("limit", "20");
@@ -108,10 +119,10 @@ function FeedContent() {
         setLoadingMore(false);
       }
     },
-    [filters]
+    [filters, debouncedSearch]
   );
 
-  // Re-fetch when filters change
+  // Re-fetch when filters or search changes
   useEffect(() => {
     setPage(1);
     fetchJobs(1);
@@ -187,6 +198,27 @@ function FeedContent() {
 
           {/* Main content */}
           <div className="flex-1 min-w-0">
+            {/* Search bar */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search by title, company or skill…"
+                className="w-full h-10 pl-9 pr-9 text-sm bg-bg-elevated border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors duration-150"
+              />
+              {searchInput && (
+                <button
+                  onClick={() => { setSearchInput(""); searchRef.current?.focus(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
             {/* Header bar */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -198,7 +230,7 @@ function FeedContent() {
                   <span className="font-medium text-text-primary tabular-nums">
                     {total.toLocaleString()}
                   </span>{" "}
-                  open roles
+                  {debouncedSearch ? `results for "${debouncedSearch}"` : "open roles"}
                 </p>
               </div>
             </div>
@@ -225,7 +257,7 @@ function FeedContent() {
                 ))}
               </div>
             ) : jobs.length === 0 ? (
-              <EmptyState />
+              <EmptyState query={debouncedSearch} />
             ) : (
               <>
                 <div className="space-y-3">
@@ -293,15 +325,17 @@ export default function FeedPage() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ query }: { query?: string }) {
   return (
     <div className="text-center py-16">
       <SearchX className="w-10 h-10 text-text-tertiary mx-auto mb-4" />
       <h3 className="text-lg font-semibold text-text-primary mb-1">
-        No jobs found
+        {query ? `No results for "${query}"` : "No jobs found"}
       </h3>
       <p className="text-sm text-text-secondary max-w-[300px] mx-auto">
-        Try adjusting your filters or broadening your search to see more roles.
+        {query
+          ? "Try a different title, company name, or skill keyword."
+          : "Try adjusting your filters or broadening your search."}
       </p>
     </div>
   );
