@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
 
     let email: string;
     let name: string;
+    let surname: string = "";
     let roleTypes: string[] = [];
     let linkedinUrl: string | undefined;
     let cvFilename: string | undefined;
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       email = (formData.get("email") as string) || "";
       name = (formData.get("name") as string) || "";
+      surname = (formData.get("surname") as string) || "";
       const roleTypesRaw = formData.get("roleTypes") as string;
       roleTypes = roleTypesRaw ? JSON.parse(roleTypesRaw) : [];
       linkedinUrl = (formData.get("linkedin_url") as string) || undefined;
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       email = body.email || "";
       name = body.name || "";
+      surname = body.surname || "";
       roleTypes = body.roleTypes || [];
       linkedinUrl = body.linkedin_url || undefined;
       location = body.location || undefined;
@@ -88,6 +91,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Require at least LinkedIn URL or CV
+    if (!linkedinUrl && !cvPath) {
+      return NextResponse.json(
+        { error: "Please provide a LinkedIn URL or CV" },
+        { status: 400 }
+      );
+    }
+
     // Upsert candidate
     const candidate = await upsertCandidate(
       email.toLowerCase().trim(),
@@ -96,7 +107,8 @@ export async function POST(request: NextRequest) {
       linkedinUrl,
       cvFilename,
       cvPath,
-      location
+      location,
+      surname.trim()
     );
 
     // Generate verification token

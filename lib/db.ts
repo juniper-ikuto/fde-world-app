@@ -33,6 +33,7 @@ async function getDb(): Promise<SqlJsDatabase> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       name TEXT,
+      surname TEXT,
       role_types TEXT,
       location TEXT,
       remote_pref TEXT,
@@ -78,6 +79,7 @@ async function getDb(): Promise<SqlJsDatabase> {
     "ALTER TABLE candidates ADD COLUMN notice_period TEXT",
     "ALTER TABLE candidates ADD COLUMN salary_min INTEGER",
     "ALTER TABLE candidates ADD COLUMN salary_currency TEXT DEFAULT 'GBP'",
+    "ALTER TABLE candidates ADD COLUMN surname TEXT",
   ]) {
     try { db.run(col); } catch { /* column already exists */ }
   }
@@ -565,6 +567,7 @@ export interface Candidate {
   id: number;
   email: string;
   name: string | null;
+  surname?: string | null;
   role_types: string | null;
   location: string | null;
   remote_pref: string | null;
@@ -599,7 +602,8 @@ export async function upsertCandidate(
   linkedinUrl?: string,
   cvFilename?: string,
   cvPath?: string,
-  location?: string
+  location?: string,
+  surname?: string
 ): Promise<Candidate> {
   const database = await getDb();
   const roleTypesJson = JSON.stringify(roleTypes);
@@ -612,13 +616,13 @@ export async function upsertCandidate(
 
   if (existing.length > 0 && existing[0].values.length > 0) {
     database.run(
-      "UPDATE candidates SET name = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), location = COALESCE(?, location), last_active_at = datetime('now') WHERE email = ?",
-      [name, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null, email]
+      "UPDATE candidates SET name = ?, surname = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), location = COALESCE(?, location), last_active_at = datetime('now') WHERE email = ?",
+      [name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null, email]
     );
   } else {
     database.run(
-      "INSERT INTO candidates (email, name, role_types, linkedin_url, cv_filename, cv_path, location) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [email, name, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null]
+      "INSERT INTO candidates (email, name, surname, role_types, linkedin_url, cv_filename, cv_path, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [email, name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null]
     );
   }
 
@@ -707,6 +711,7 @@ export async function updateCandidate(
   id: number,
   fields: {
     name?: string;
+    surname?: string;
     role_types?: string;
     remote_pref?: string;
     alert_freq?: string;
@@ -733,7 +738,7 @@ export async function updateCandidate(
   const params: (string | number)[] = [];
 
   const stringFields = [
-    "name", "role_types", "remote_pref", "alert_freq",
+    "name", "surname", "role_types", "remote_pref", "alert_freq",
     "current_role", "current_company", "skills", "open_to_work",
     "location", "work_auth", "notice_period", "salary_currency",
     "linkedin_url", "linkedin_id", "avatar_url",
@@ -1170,4 +1175,61 @@ export async function deleteJob(id: number, hard?: boolean): Promise<void> {
     database.run("UPDATE jobs SET status = ? WHERE id = ?", ["closed", id]);
   }
   forceSave();
+}
+
+// ── Admin candidate search ──
+
+export async function adminSearchCandidates(params: {
+  search?: string;
+  has_cv?: boolean;
+  has_linkedin?: boolean;
+  open_to_work?: boolean;
+  page: number;
+  limit: number;
+}): Promise<{ candidates: Record<string, unknown>[]; total: number }> {
+  const database = await getDb();
+  const conditions: string[] = [];
+  const bindParams: (string | number)[] = [];
+
+  if (params.search) {
+    const term = `%${params.search.toLowerCase()}%`;
+    conditions.push("(lower(name) LIKE ? OR lower(surname) LIKE ? OR lower(email) LIKE ?)");
+    bindParams.push(term, term, term);
+  }
+
+  if (params.has_cv) {
+    conditions.push("cv_path IS NOT NULL AND cv_path != ''");
+  }
+
+  if (params.has_linkedin) {
+    conditions.push("linkedin_url IS NOT NULL AND linkedin_url != ''");
+  }
+
+  if (params.open_to_work) {
+    conditions.push("open_to_work = 'active'");
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const countResult = database.exec(
+    `SELECT COUNT(*) FROM candidates ${whereClause}`,
+    bindParams
+  );
+  const total = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+
+  const offset = (params.page - 1) * params.limit;
+  const dataResult = database.exec(
+    `SELECT * FROM candidates ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+    [...bindParams, params.limit, offset]
+  );
+
+  const candidates: Record<string, unknown>[] = [];
+  if (dataResult.length > 0) {
+    const columns = dataResult[0].columns;
+    for (const row of dataResult[0].values) {
+      candidates.push(rowToObject(columns, row));
+    }
+  }
+
+  return { candidates, total };
 }

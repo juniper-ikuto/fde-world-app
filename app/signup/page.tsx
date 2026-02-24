@@ -19,6 +19,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [surname, setSurname] = useState("");
   const [location, setLocation] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [linkedinUrl, setLinkedinUrl] = useState("");
@@ -62,10 +63,17 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
 
+    if (!linkedinUrl.trim() && !cvFile) {
+      setError("Please add your LinkedIn profile URL or upload your CV \u2014 we need at least one to verify you work in this space.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append("email", email.trim().toLowerCase());
       formData.append("name", name.trim());
+      formData.append("surname", surname.trim());
       formData.append("roleTypes", JSON.stringify(selectedRoles));
 
       if (location.trim()) {
@@ -163,6 +171,25 @@ export default function SignupPage() {
                 />
               </div>
 
+              {/* Surname */}
+              <div>
+                <label
+                  htmlFor="surname"
+                  className="block text-sm font-medium text-text-primary mb-1.5"
+                >
+                  Last name
+                </label>
+                <input
+                  id="surname"
+                  type="text"
+                  required
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
+                  placeholder="Smith"
+                  className="w-full h-10 px-3 text-sm bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all duration-150"
+                />
+              </div>
+
               {/* Location (optional) */}
               <div>
                 <label
@@ -206,14 +233,13 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* LinkedIn URL (optional) */}
+              {/* LinkedIn URL */}
               <div>
                 <label
                   htmlFor="linkedin"
                   className="block text-sm font-medium text-text-primary mb-1.5"
                 >
-                  LinkedIn profile URL{" "}
-                  <span className="text-text-tertiary font-normal">(optional)</span>
+                  LinkedIn profile URL
                 </label>
                 <input
                   id="linkedin"
@@ -225,11 +251,11 @@ export default function SignupPage() {
                 />
               </div>
 
-              {/* CV Upload (optional) */}
+              {/* CV Upload */}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
                   Upload your CV{" "}
-                  <span className="text-text-tertiary font-normal">(optional, PDF/Word)</span>
+                  <span className="text-text-tertiary font-normal">(PDF/Word)</span>
                 </label>
                 <input
                   ref={fileInputRef}
@@ -267,6 +293,9 @@ export default function SignupPage() {
                 )}
                 <p className="text-xs text-text-tertiary mt-1">
                   PDF or Word, max 5MB
+                </p>
+                <p className="text-xs text-text-tertiary mt-1">
+                  Please provide at least one of: LinkedIn profile URL or CV
                 </p>
               </div>
 
