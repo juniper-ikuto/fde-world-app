@@ -16,6 +16,7 @@ export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
+  const [isEmployer, setIsEmployer] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -26,6 +27,11 @@ export default function Nav() {
         if (data?.email) setCandidate({ id: data.id, name: data.name, email: data.email });
       })
       .catch(() => {});
+
+    fetch("/api/employer/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setIsEmployer(!!data?.id))
+      .catch(() => setIsEmployer(false));
   }, [pathname]); // re-fetch on navigation so sign-in/out reflects immediately
 
   const isAuthenticated = !!candidate;
@@ -91,6 +97,20 @@ export default function Nav() {
               </Link>
             </>
           )}
+
+          {isEmployer && (
+            <Link
+              href="/employer/dashboard"
+              className={cn(
+                "px-3 py-1.5 text-sm rounded-md transition-colors duration-150",
+                pathname === "/employer/dashboard"
+                  ? "text-text-primary bg-bg-secondary"
+                  : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+              )}
+            >
+              My Dashboard
+            </Link>
+          )}
         </div>
 
         {/* Right side */}
@@ -137,12 +157,14 @@ export default function Nav() {
             </div>
           ) : (
             <>
-              <Link
-                href="/employers"
-                className="text-sm text-text-tertiary hover:text-text-secondary transition-colors duration-150"
-              >
-                For employers →
-              </Link>
+              {!isEmployer && (
+                <Link
+                  href="/employers"
+                  className="text-sm text-text-tertiary hover:text-text-secondary transition-colors duration-150"
+                >
+                  For employers →
+                </Link>
+              )}
               <Link
                 href="/auth"
                 className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
@@ -203,6 +225,16 @@ export default function Nav() {
               </>
             )}
 
+            {isEmployer && (
+              <Link
+                href="/employer/dashboard"
+                onClick={() => setMobileOpen(false)}
+                className="block px-3 py-2 text-sm rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+              >
+                My Dashboard
+              </Link>
+            )}
+
             <div className="pt-2 border-t border-border mt-2">
               {isAuthenticated ? (
                 <button
@@ -231,13 +263,15 @@ export default function Nav() {
                   >
                     Join free →
                   </Link>
-                  <Link
-                    href="/employers"
-                    onClick={() => setMobileOpen(false)}
-                    className="block px-3 py-2 text-sm text-text-tertiary"
-                  >
-                    For employers →
-                  </Link>
+                  {!isEmployer && (
+                    <Link
+                      href="/employers"
+                      onClick={() => setMobileOpen(false)}
+                      className="block px-3 py-2 text-sm text-text-tertiary"
+                    >
+                      For employers →
+                    </Link>
+                  )}
                 </>
               )}
             </div>

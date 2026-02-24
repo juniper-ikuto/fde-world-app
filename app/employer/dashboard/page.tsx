@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2,
   Plus,
@@ -141,8 +142,15 @@ export default function EmployerDashboard() {
       <Nav />
 
       <div className="max-w-content mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <Link
+          href="/feed"
+          className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
+        >
+          ← Browse jobs
+        </Link>
+
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 mt-4">
           <div>
             <h1 className="text-xl font-semibold tracking-heading text-text-primary">
               Your job submissions
