@@ -26,8 +26,8 @@ export async function PATCH(
 
     const body = await request.json();
     const allowed = [
-      "title", "company", "location", "salary_min", "salary_max",
-      "salary_currency", "job_url", "status", "posted_date",
+      "title", "company", "location", "salary_range",
+      "job_url", "status", "posted_date",
     ] as const;
 
     const fields: Record<string, string | number | null> = {};

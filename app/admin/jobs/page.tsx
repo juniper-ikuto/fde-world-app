@@ -23,9 +23,7 @@ interface AdminJob {
   status: string;
   posted_date: string | null;
   first_seen_at: string | null;
-  salary_min: number | null;
-  salary_max: number | null;
-  salary_currency: string | null;
+  salary_range: string | null;
 }
 
 const ATS_PLATFORMS = ["greenhouse", "lever", "ashby", "recruitee", "workable"] as const;
@@ -137,9 +135,7 @@ function AdminJobsContent() {
       title: job.title || "",
       company: job.company || "",
       location: job.location || "",
-      salary_min: job.salary_min != null ? String(job.salary_min) : "",
-      salary_max: job.salary_max != null ? String(job.salary_max) : "",
-      salary_currency: job.salary_currency || "",
+      salary_range: job.salary_range || "",
       job_url: job.job_url || "",
       status: job.status || "open",
       posted_date: job.posted_date || "",
@@ -154,9 +150,7 @@ function AdminJobsContent() {
       body.title = editForm.title;
       body.company = editForm.company;
       body.location = editForm.location || null;
-      body.salary_min = editForm.salary_min ? parseInt(editForm.salary_min, 10) : null;
-      body.salary_max = editForm.salary_max ? parseInt(editForm.salary_max, 10) : null;
-      body.salary_currency = editForm.salary_currency || null;
+      body.salary_range = editForm.salary_range || null;
       body.job_url = editForm.job_url;
       body.status = editForm.status;
       body.posted_date = editForm.posted_date || null;
@@ -397,9 +391,7 @@ function AdminJobsContent() {
               <Field label="Location" value={editForm.location} onChange={(v) => setEditForm((f) => ({ ...f, location: v }))} />
 
               <div className="grid grid-cols-3 gap-3">
-                <Field label="Salary min" value={editForm.salary_min} onChange={(v) => setEditForm((f) => ({ ...f, salary_min: v }))} type="number" />
-                <Field label="Salary max" value={editForm.salary_max} onChange={(v) => setEditForm((f) => ({ ...f, salary_max: v }))} type="number" />
-                <Field label="Currency" value={editForm.salary_currency} onChange={(v) => setEditForm((f) => ({ ...f, salary_currency: v }))} />
+                <Field label="Salary range" value={editForm.salary_range} onChange={(v) => setEditForm((f) => ({ ...f, salary_range: v }))} />
               </div>
 
               <Field label="Job URL" value={editForm.job_url} onChange={(v) => setEditForm((f) => ({ ...f, job_url: v }))} />

@@ -1113,7 +1113,7 @@ export async function adminSearchJobs(params: {
   const offset = (params.page - 1) * params.limit;
   const dataResult = database.exec(
     `SELECT id, title, company, location, url AS job_url, source, status, posted_date, first_seen_at,
-            salary_min, salary_max, salary_currency
+            salary_range, country
      FROM jobs ${whereClause}
      ORDER BY first_seen_at DESC
      LIMIT ? OFFSET ?`,
@@ -1137,9 +1137,7 @@ export async function updateJob(
     title: string;
     company: string;
     location: string;
-    salary_min: number | null;
-    salary_max: number | null;
-    salary_currency: string | null;
+    salary_range: string | null;
     job_url: string;
     status: string;
     posted_date: string | null;
