@@ -198,8 +198,8 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
 };
 
 export const ROLE_LABELS: Record<string, string> = {
-  se: "Solutions Engineer",
   fde: "Forward Deployed Engineer",
+  se: "Solutions Engineer",
   presales: "Pre-Sales / Sales Engineer",
   tam: "Technical Account Manager",
   impl: "Implementation Engineer",

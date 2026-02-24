@@ -106,6 +106,15 @@ export default function Nav() {
               Post a Job
             </Link>
           )}
+
+          {!isAuthenticated && !isEmployer && (
+            <Link
+              href="/employers"
+              className="px-3 py-1.5 text-sm text-text-tertiary hover:text-text-secondary transition-colors duration-150"
+            >
+              For employers
+            </Link>
+          )}
         </div>
 
         {/* Right side */}
@@ -152,14 +161,6 @@ export default function Nav() {
             </div>
           ) : (
             <>
-              {!isEmployer && (
-                <Link
-                  href="/employers"
-                  className="text-sm text-text-tertiary hover:text-text-secondary transition-colors duration-150"
-                >
-                  For employers →
-                </Link>
-              )}
               <Link
                 href="/auth"
                 className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
