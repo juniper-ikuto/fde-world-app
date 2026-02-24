@@ -2,58 +2,78 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// Allowed HTML tags for sanitised output
+// Semantic tags to keep (no div/span — they become structureless noise when classes are stripped)
 const ALLOWED_TAGS = new Set([
-  "p",
-  "ul",
-  "ol",
-  "li",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "strong",
-  "em",
-  "b",
-  "i",
-  "a",
-  "br",
-  "div",
-  "span",
+  "p", "ul", "ol", "li",
+  "h1", "h2", "h3", "h4",
+  "strong", "em", "b", "i",
+  "a", "br",
 ]);
 
 function sanitiseHtml(html: string): string {
-  // Strip <script>, <style>, <iframe> tags and their contents
+  // 1. Strip script/style/iframe and their contents
   let clean = html.replace(
-    /<(script|style|iframe|noscript)[^>]*>[\s\S]*?<\/\1>/gi,
+    /<(script|style|iframe|noscript|head)[^>]*>[\s\S]*?<\/\1>/gi,
     ""
   );
 
-  // Remove event attributes (on*)
+  // 2. Remove event attributes
   clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
 
-  // Remove tags not in whitelist, keep their content
+  // 3. Convert block-level unknown tags to paragraph breaks so content doesn't run together
+  clean = clean.replace(/<\/?(?:div|section|article|header|footer|aside|main|table|tr|td|th|thead|tbody)[^>]*>/gi, "\n");
+
+  // 4. Process remaining tags
   clean = clean.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g, (match, tag) => {
     const lower = tag.toLowerCase();
     if (ALLOWED_TAGS.has(lower)) {
-      // Keep the tag but strip non-href attributes
       if (lower === "a") {
-        const hrefMatch = match.match(/href\s*=\s*"([^"]*)"/i);
-        if (hrefMatch) {
-          const isClosing = match.startsWith("</");
-          return isClosing
-            ? "</a>"
-            : `<a href="${hrefMatch[1]}" target="_blank" rel="noopener noreferrer">`;
+        const hrefMatch = match.match(/href\s*=\s*["']([^"']*)["']/i);
+        if (hrefMatch && !match.startsWith("</")) {
+          const href = hrefMatch[1];
+          // Only keep http/https links
+          if (href.startsWith("http://") || href.startsWith("https://")) {
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer">`;
+          }
+          return ""; // strip non-http links (mailto, javascript, etc)
         }
+        return match.startsWith("</") ? "</a>" : "";
       }
-      // For opening/closing of allowed tags, keep minimal
       const isClosing = match.startsWith("</");
       return isClosing ? `</${lower}>` : `<${lower}>`;
     }
-    return ""; // strip unknown tags
+    return ""; // strip everything else, keep content
   });
 
-  return clean.trim();
+  // 5. Convert newline sequences (from block tag removal) into paragraph breaks
+  clean = clean.replace(/\n{2,}/g, "</p><p>");
+  clean = clean.replace(/\n/g, " ");
+
+  // 6. Collapse runs of <br> into paragraph breaks
+  clean = clean.replace(/(<br\s*\/?>\s*){2,}/gi, "</p><p>");
+
+  // 7. Remove empty tags
+  clean = clean.replace(/<(p|li|h[1-4]|strong|em)>\s*<\/\1>/gi, "");
+
+  // 8. Decode common HTML entities
+  clean = clean
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#8203;/g, ""); // zero-width space
+
+  // 9. Collapse excess whitespace
+  clean = clean.replace(/\s{3,}/g, " ").trim();
+
+  // 10. Wrap bare text (not inside a block tag) in <p>
+  if (clean && !clean.trimStart().startsWith("<")) {
+    clean = `<p>${clean}</p>`;
+  }
+
+  return clean;
 }
 
 function stripHtml(html: string): string {
@@ -111,6 +131,36 @@ async function fetchGreenhouseJob(
       title: data.title || "",
       description_html: data.content || "",
     };
+  } catch {
+    return null;
+  }
+}
+
+// Extract company slug and job UUID from an Ashby URL
+function parseAshbyUrl(url: string): { slug: string; jobId: string } | null {
+  try {
+    const parsed = new URL(url);
+    // Format: https://jobs.ashbyhq.com/{slug}/{uuid}
+    const match = parsed.pathname.match(/^\/([^/]+)\/([a-f0-9-]+)/i);
+    if (match) return { slug: match[1], jobId: match[2] };
+  } catch {}
+  return null;
+}
+
+async function fetchAshbyJob(
+  url: string
+): Promise<{ title: string; description_html: string } | null> {
+  const parsed = parseAshbyUrl(url);
+  if (!parsed) return null;
+
+  try {
+    const apiUrl = `https://api.ashbyhq.com/posting-api/job-board/${parsed.slug}/job-postings/${parsed.jobId}`;
+    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Ashby returns descriptionHtml or descriptionBody
+    const html = data.descriptionHtml || data.descriptionBody || "";
+    return { title: data.title || "", description_html: html };
   } catch {
     return null;
   }
@@ -252,11 +302,13 @@ export async function GET(request: NextRequest) {
 
     let result: { title: string; description_html: string } | null = null;
 
-    // For Greenhouse and Lever, prefer their public APIs
+    // Prefer ATS public APIs where available
     if (source === "greenhouse" || url.includes("greenhouse.io")) {
       result = await fetchGreenhouseJob(url);
     } else if (source === "lever" || url.includes("lever.co")) {
       result = await fetchLeverJob(url);
+    } else if (source === "ashby" || url.includes("ashbyhq.com")) {
+      result = await fetchAshbyJob(url);
     }
 
     // Fallback: scrape the HTML page
