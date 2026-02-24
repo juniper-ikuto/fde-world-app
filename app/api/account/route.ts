@@ -6,6 +6,8 @@ import {
   deleteCandidate,
   getSavedJobCount,
 } from "@/lib/db";
+import fs from "fs";
+import path from "path";
 
 export async function GET() {
   try {
@@ -116,6 +118,25 @@ export async function DELETE() {
     const candidateId = await getSessionCandidateId();
     if (!candidateId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Delete physical CV file if it exists
+    const candidate = await getCandidateById(candidateId);
+    if (candidate?.cv_path) {
+      const filename = candidate.cv_path.split("/").pop();
+      if (filename) {
+        const filepath = path.join(
+          process.env.DATA_DIR || process.cwd(),
+          "uploads",
+          "cvs",
+          filename
+        );
+        try {
+          if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        } catch {
+          // File may already be gone — continue with account deletion
+        }
+      }
     }
 
     await deleteCandidate(candidateId);

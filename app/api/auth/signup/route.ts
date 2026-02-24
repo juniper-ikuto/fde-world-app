@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Save file
-        const uploadDir = path.join(process.cwd(), "public", "uploads", "cvs");
+        const uploadDir = path.join(process.env.DATA_DIR || process.cwd(), "uploads", "cvs");
         fs.mkdirSync(uploadDir, { recursive: true });
 
         const safeName = cvFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         fs.writeFileSync(filepath, buffer);
 
         cvFilename = cvFile.name;
-        cvPath = `/uploads/cvs/${filename}`;
+        cvPath = `/api/account/cv/file/${filename}`;
       }
     } else {
       const body = await request.json();

@@ -243,15 +243,22 @@ export default function AccountPage() {
     }
   };
 
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const handleDelete = async () => {
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch("/api/account", { method: "DELETE" });
       if (res.ok) {
         router.push("/");
         router.refresh();
+      } else {
+        setDeleteError("Something went wrong. Please try again.");
+        setDeleting(false);
       }
     } catch {
+      setDeleteError("Something went wrong. Please try again.");
       setDeleting(false);
       setConfirmDelete(false);
     }
@@ -773,7 +780,8 @@ export default function AccountPage() {
                   Danger zone
                 </h2>
                 <p className="text-sm text-text-secondary mb-4">
-                  Permanently delete your account and all saved jobs. This cannot be undone.
+                  This will permanently delete your account and all your data,
+                  including your CV. This cannot be undone.
                 </p>
                 {confirmDelete ? (
                   <div className="flex items-center gap-3">
@@ -783,7 +791,7 @@ export default function AccountPage() {
                       className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-150 disabled:opacity-50"
                     >
                       {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      Yes, delete my account
+                      Yes, delete everything
                     </button>
                     <button
                       onClick={() => setConfirmDelete(false)}
@@ -797,8 +805,11 @@ export default function AccountPage() {
                     onClick={() => setConfirmDelete(true)}
                     className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors duration-150"
                   >
-                    Delete account
+                    Delete my account
                   </button>
+                )}
+                {deleteError && (
+                  <p className="text-sm text-destructive mt-3">{deleteError}</p>
                 )}
               </section>
             </>

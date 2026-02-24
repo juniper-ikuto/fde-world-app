@@ -25,6 +25,7 @@ export default function SignupPage() {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleRole = (role: string) => {
@@ -274,10 +275,33 @@ export default function SignupPage() {
                 <p className="text-sm text-destructive">{error}</p>
               )}
 
+              {/* Consent */}
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  required
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 accent-accent"
+                />
+                <span className="text-xs text-zinc-500 leading-relaxed">
+                  I agree to the{" "}
+                  <Link
+                    href="/privacy"
+                    className="underline hover:text-text-secondary transition-colors duration-150"
+                    target="_blank"
+                  >
+                    Privacy Policy
+                  </Link>{" "}
+                  and consent to my personal data being stored and processed to
+                  power my FDE World profile and job alerts.
+                </span>
+              </label>
+
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !consent}
                 className="w-full flex items-center justify-center gap-2 h-11 bg-accent hover:bg-accent-hover disabled:opacity-60 text-white font-medium text-sm rounded-md transition-colors duration-150"
               >
                 {loading ? (
@@ -295,7 +319,7 @@ export default function SignupPage() {
               We&apos;ll send you a magic sign-in link. No password needed. FDE
               World is run by Ikuto Group, a specialist SE/FDE recruiter.{" "}
               <Link
-                href="#"
+                href="/privacy"
                 className="underline hover:text-text-secondary transition-colors duration-150"
               >
                 Privacy policy
