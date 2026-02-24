@@ -108,7 +108,7 @@ export default function Nav() {
                   : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
               )}
             >
-              My Dashboard
+              Submit Job
             </Link>
           )}
         </div>
@@ -231,7 +231,7 @@ export default function Nav() {
                 onClick={() => setMobileOpen(false)}
                 className="block px-3 py-2 text-sm rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
               >
-                My Dashboard
+                Submit Job
               </Link>
             )}
 
