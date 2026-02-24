@@ -1072,3 +1072,104 @@ export async function getOrCreateJobFromUrl(
   forceSave();
   return { job_id: result[0].values[0][0] as number, was_duplicate: false };
 }
+
+// ── Admin job management ──
+
+export async function adminSearchJobs(params: {
+  search?: string;
+  status?: string;
+  source?: string;
+  page: number;
+  limit: number;
+}): Promise<{ jobs: Record<string, unknown>[]; total: number }> {
+  const database = await getDb();
+  const conditions: string[] = [];
+  const bindParams: (string | number)[] = [];
+
+  if (params.search) {
+    const term = `%${params.search.toLowerCase()}%`;
+    conditions.push("(lower(title) LIKE ? OR lower(company) LIKE ?)");
+    bindParams.push(term, term);
+  }
+
+  if (params.status && params.status !== "all") {
+    conditions.push("status = ?");
+    bindParams.push(params.status);
+  }
+
+  if (params.source && params.source !== "all") {
+    conditions.push("source = ?");
+    bindParams.push(params.source);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const countResult = database.exec(
+    `SELECT COUNT(*) FROM jobs ${whereClause}`,
+    bindParams
+  );
+  const total = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+
+  const offset = (params.page - 1) * params.limit;
+  const dataResult = database.exec(
+    `SELECT id, title, company, location, url AS job_url, source, status, posted_date, first_seen_at,
+            salary_min, salary_max, salary_currency
+     FROM jobs ${whereClause}
+     ORDER BY first_seen_at DESC
+     LIMIT ? OFFSET ?`,
+    [...bindParams, params.limit, offset]
+  );
+
+  const jobs: Record<string, unknown>[] = [];
+  if (dataResult.length > 0) {
+    const columns = dataResult[0].columns;
+    for (const row of dataResult[0].values) {
+      jobs.push(rowToObject(columns, row));
+    }
+  }
+
+  return { jobs, total };
+}
+
+export async function updateJob(
+  id: number,
+  fields: Partial<{
+    title: string;
+    company: string;
+    location: string;
+    salary_min: number | null;
+    salary_max: number | null;
+    salary_currency: string | null;
+    job_url: string;
+    status: string;
+    posted_date: string | null;
+  }>
+): Promise<void> {
+  const database = await getDb();
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      const col = key === "job_url" ? "url" : key;
+      sets.push(`${col} = ?`);
+      params.push(value);
+    }
+  }
+
+  if (sets.length === 0) return;
+
+  params.push(id);
+  database.run(`UPDATE jobs SET ${sets.join(", ")} WHERE id = ?`, params);
+  forceSave();
+}
+
+export async function deleteJob(id: number, hard?: boolean): Promise<void> {
+  const database = await getDb();
+  if (hard) {
+    database.run("DELETE FROM jobs WHERE id = ?", [id]);
+  } else {
+    database.run("UPDATE jobs SET status = ? WHERE id = ?", ["closed", id]);
+  }
+  forceSave();
+}
