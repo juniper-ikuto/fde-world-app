@@ -145,6 +145,18 @@ async function getDb(): Promise<SqlJsDatabase> {
     )
   `);
 
+  // Admin auth tokens
+  db.run(`
+    CREATE TABLE IF NOT EXISTS admin_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT UNIQUE NOT NULL,
+      email TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   saveDb();
   return db;
 }
@@ -1232,4 +1244,39 @@ export async function adminSearchCandidates(params: {
   }
 
   return { candidates, total };
+}
+
+// ── Admin token queries ──
+
+export async function createAdminTokenRecord(
+  tokenHash: string,
+  email: string,
+  expiresAt: string
+): Promise<void> {
+  const database = await getDb();
+  database.run(
+    "INSERT INTO admin_tokens (token_hash, email, expires_at) VALUES (?, ?, ?)",
+    [tokenHash, email, expiresAt]
+  );
+  forceSave();
+}
+
+export async function consumeAdminToken(
+  tokenHash: string
+): Promise<{ email: string } | null> {
+  const database = await getDb();
+  const result = database.exec(
+    "SELECT email FROM admin_tokens WHERE token_hash = ? AND used = 0 AND expires_at > datetime('now')",
+    [tokenHash]
+  );
+
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  database.run(
+    "UPDATE admin_tokens SET used = 1 WHERE token_hash = ?",
+    [tokenHash]
+  );
+  forceSave();
+
+  return { email: result[0].values[0][0] as string };
 }

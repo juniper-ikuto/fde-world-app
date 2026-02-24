@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateJob, deleteJob } from "@/lib/db";
+import { getAdminSession } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
-
-function authorize(request: NextRequest): boolean {
-  const token = request.headers.get("x-admin-token");
-  const syncToken = process.env.DB_SYNC_TOKEN;
-  return !!(syncToken && token === syncToken);
-}
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!authorize(request)) {
+  if (!getAdminSession(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -49,7 +44,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!authorize(request)) {
+  if (!getAdminSession(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

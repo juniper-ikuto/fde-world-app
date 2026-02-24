@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2,
   CheckCircle2,
@@ -28,7 +29,7 @@ interface Submission {
 
 function AdminContent() {
   const searchParams = useSearchParams();
-  const tokenParam = searchParams.get("token");
+  void searchParams; // Suspense boundary requires useSearchParams
 
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,23 +37,9 @@ function AdminContent() {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [rejectReasons, setRejectReasons] = useState<Record<number, string>>({});
 
-  // Derive admin token from query param — must match first 8 chars of DB_SYNC_TOKEN
-  // The actual validation happens on the API side; we use the full DB_SYNC_TOKEN as header
-  // Since we can't access env vars client-side, the admin provides a short token in the URL
-  // and we need to figure out the full token. Instead, we'll just pass the token as a header
-  // and let the API validate it. The admin page is a client page that calls the API with
-  // x-admin-token header.
-
   const fetchSubmissions = useCallback(async () => {
-    if (!tokenParam) {
-      setLoading(false);
-      return;
-    }
-
     try {
-      const res = await fetch("/api/admin/employer-submissions", {
-        headers: { "x-admin-token": tokenParam },
-      });
+      const res = await fetch("/api/admin/employer-submissions");
 
       if (!res.ok) {
         setLoading(false);
@@ -67,19 +54,17 @@ function AdminContent() {
     } finally {
       setLoading(false);
     }
-  }, [tokenParam]);
+  }, []);
 
   useEffect(() => {
     fetchSubmissions();
   }, [fetchSubmissions]);
 
   const handleApprove = async (id: number) => {
-    if (!tokenParam) return;
     setActionLoading(id);
     try {
       await fetch(`/api/admin/employer-submissions/${id}/approve`, {
         method: "POST",
-        headers: { "x-admin-token": tokenParam },
       });
       await fetchSubmissions();
     } catch (err) {
@@ -90,13 +75,11 @@ function AdminContent() {
   };
 
   const handleReject = async (id: number) => {
-    if (!tokenParam) return;
     setActionLoading(id);
     try {
       await fetch(`/api/admin/employer-submissions/${id}/reject`, {
         method: "POST",
         headers: {
-          "x-admin-token": tokenParam,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ reason: rejectReasons[id] || undefined }),
@@ -128,10 +111,15 @@ function AdminContent() {
     );
   }
 
-  if (!tokenParam || !authorized) {
+  if (!authorized) {
     return (
       <div className="flex items-center justify-center py-32">
-        <p className="text-sm text-text-tertiary">Unauthorized</p>
+        <div className="text-center">
+          <p className="text-sm text-text-tertiary mb-3">Not authorised</p>
+          <Link href="/admin/login" className="text-sm text-accent hover:underline">
+            Go to admin login
+          </Link>
+        </div>
       </div>
     );
   }

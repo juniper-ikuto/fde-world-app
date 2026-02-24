@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSearchCandidates } from "@/lib/db";
+import { getAdminSession } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const token = request.headers.get("x-admin-token");
-  const syncToken = process.env.DB_SYNC_TOKEN;
-
-  if (!syncToken || token !== syncToken) {
+  if (!getAdminSession(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

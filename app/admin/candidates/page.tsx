@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2,
   Search,
@@ -45,9 +45,6 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 function AdminCandidatesContent() {
-  const searchParams = useSearchParams();
-  const tokenParam = searchParams.get("token");
-
   const [candidates, setCandidates] = useState<AdminCandidate[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -72,11 +69,6 @@ function AdminCandidatesContent() {
       otw: boolean,
       pg: number
     ) => {
-      if (!tokenParam) {
-        setLoading(false);
-        return;
-      }
-
       try {
         const params = new URLSearchParams();
         if (searchTerm) params.set("search", searchTerm);
@@ -86,9 +78,7 @@ function AdminCandidatesContent() {
         params.set("page", String(pg));
         params.set("limit", String(limit));
 
-        const res = await fetch(`/api/admin/candidates?${params}`, {
-          headers: { "x-admin-token": tokenParam },
-        });
+        const res = await fetch(`/api/admin/candidates?${params}`);
 
         if (!res.ok) {
           setLoading(false);
@@ -105,7 +95,7 @@ function AdminCandidatesContent() {
         setLoading(false);
       }
     },
-    [tokenParam]
+    []
   );
 
   useEffect(() => {
@@ -158,10 +148,15 @@ function AdminCandidatesContent() {
     );
   }
 
-  if (!tokenParam || !authorized) {
+  if (!authorized) {
     return (
       <div className="flex items-center justify-center py-32">
-        <p className="text-sm text-text-tertiary">Unauthorized</p>
+        <div className="text-center">
+          <p className="text-sm text-text-tertiary mb-3">Not authorised</p>
+          <Link href="/admin/login" className="text-sm text-accent hover:underline">
+            Go to admin login
+          </Link>
+        </div>
       </div>
     );
   }

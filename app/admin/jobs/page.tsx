@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2,
   Search,
@@ -29,9 +29,6 @@ interface AdminJob {
 const ATS_PLATFORMS = ["greenhouse", "lever", "ashby", "recruitee", "workable"] as const;
 
 function AdminJobsContent() {
-  const searchParams = useSearchParams();
-  const tokenParam = searchParams.get("token");
-
   const [jobs, setJobs] = useState<AdminJob[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -54,11 +51,6 @@ function AdminJobsContent() {
 
   const fetchJobs = useCallback(
     async (searchTerm: string, status: string, source: string, pg: number) => {
-      if (!tokenParam) {
-        setLoading(false);
-        return;
-      }
-
       try {
         const params = new URLSearchParams();
         if (searchTerm) params.set("search", searchTerm);
@@ -67,9 +59,7 @@ function AdminJobsContent() {
         params.set("page", String(pg));
         params.set("limit", String(limit));
 
-        const res = await fetch(`/api/admin/jobs?${params}`, {
-          headers: { "x-admin-token": tokenParam },
-        });
+        const res = await fetch(`/api/admin/jobs?${params}`);
 
         if (!res.ok) {
           setLoading(false);
@@ -86,7 +76,7 @@ function AdminJobsContent() {
         setLoading(false);
       }
     },
-    [tokenParam]
+    []
   );
 
   useEffect(() => {
@@ -113,12 +103,10 @@ function AdminJobsContent() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!tokenParam) return;
     setActionLoading(id);
     try {
       await fetch(`/api/admin/jobs/${id}`, {
         method: "DELETE",
-        headers: { "x-admin-token": tokenParam },
       });
       setDeleteConfirm(null);
       await fetchJobs(search, statusFilter, sourceFilter, page);
@@ -143,7 +131,7 @@ function AdminJobsContent() {
   };
 
   const handleSave = async () => {
-    if (!tokenParam || !editJob) return;
+    if (!editJob) return;
     setSaving(true);
     try {
       const body: Record<string, string | number | null> = {};
@@ -158,7 +146,6 @@ function AdminJobsContent() {
       await fetch(`/api/admin/jobs/${editJob.id}`, {
         method: "PATCH",
         headers: {
-          "x-admin-token": tokenParam,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
@@ -174,7 +161,7 @@ function AdminJobsContent() {
   };
 
   const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "—";
+    if (!dateStr) return "\u2014";
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-GB", {
       day: "numeric",
@@ -193,10 +180,15 @@ function AdminJobsContent() {
     );
   }
 
-  if (!tokenParam || !authorized) {
+  if (!authorized) {
     return (
       <div className="flex items-center justify-center py-32">
-        <p className="text-sm text-text-tertiary">Unauthorized</p>
+        <div className="text-center">
+          <p className="text-sm text-text-tertiary mb-3">Not authorised</p>
+          <Link href="/admin/login" className="text-sm text-accent hover:underline">
+            Go to admin login
+          </Link>
+        </div>
       </div>
     );
   }
@@ -213,7 +205,7 @@ function AdminJobsContent() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
             type="text"
-            placeholder="Search title or company…"
+            placeholder="Search title or company\u2026"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full h-9 pl-8 pr-3 text-sm bg-bg-elevated border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:border-accent focus:outline-none transition-colors"
@@ -267,7 +259,7 @@ function AdminJobsContent() {
                 </h3>
                 <p className="text-xs text-text-secondary mt-0.5 truncate">
                   {job.company}
-                  {job.location ? ` · ${job.location}` : ""}
+                  {job.location ? ` \u00b7 ${job.location}` : ""}
                 </p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   {job.source && (

@@ -5,15 +5,13 @@ import {
   getOrCreateJobFromUrl,
   updateSubmissionJobId,
 } from "@/lib/db";
+import { getAdminSession } from "@/lib/admin-auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const token = request.headers.get("x-admin-token");
-  const syncToken = process.env.DB_SYNC_TOKEN;
-
-  if (!syncToken || token !== syncToken) {
+  if (!getAdminSession(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
