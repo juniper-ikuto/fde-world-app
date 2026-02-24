@@ -101,14 +101,9 @@ export default function Nav() {
           {isEmployer && (
             <Link
               href="/employer/dashboard"
-              className={cn(
-                "px-3 py-1.5 text-sm rounded-md transition-colors duration-150",
-                pathname === "/employer/dashboard"
-                  ? "text-text-primary bg-bg-secondary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
-              )}
+              className="px-3 py-1.5 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors duration-150"
             >
-              Submit Job
+              Post a Job
             </Link>
           )}
         </div>
@@ -229,9 +224,9 @@ export default function Nav() {
               <Link
                 href="/employer/dashboard"
                 onClick={() => setMobileOpen(false)}
-                className="block px-3 py-2 text-sm rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-secondary"
+                className="block px-3 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors duration-150"
               >
-                Submit Job
+                Post a Job
               </Link>
             )}
 
