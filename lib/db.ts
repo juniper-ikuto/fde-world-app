@@ -997,15 +997,10 @@ export async function getAllPendingSubmissions(): Promise<EmployerSubmission[]> 
     `SELECT esj.*, e.name as employer_name, e.company_name as employer_company
      FROM employer_submitted_jobs esj
      JOIN employers e ON esj.employer_id = e.id
-     WHERE esj.status = 'pending'
-     ORDER BY esj.submitted_at DESC
-     UNION ALL
-     SELECT esj.*, e.name as employer_name, e.company_name as employer_company
-     FROM employer_submitted_jobs esj
-     JOIN employers e ON esj.employer_id = e.id
-     WHERE esj.status != 'pending'
-     ORDER BY esj.reviewed_at DESC
-     LIMIT 50`
+     ORDER BY
+       CASE WHEN esj.status = 'pending' THEN 0 ELSE 1 END ASC,
+       CASE WHEN esj.status = 'pending' THEN esj.submitted_at ELSE esj.reviewed_at END DESC
+     LIMIT 100`
   );
   if (result.length === 0) return [];
   return result[0].values.map(row =>
