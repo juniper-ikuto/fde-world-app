@@ -87,6 +87,14 @@ async function getDb(): Promise<SqlJsDatabase> {
     db.run("ALTER TABLE jobs ADD COLUMN featured INTEGER DEFAULT 0");
   } catch { /* column already exists */ }
 
+  // Migrate: add verified and employer_id columns to jobs table
+  try {
+    db.run("ALTER TABLE jobs ADD COLUMN verified INTEGER DEFAULT 0");
+  } catch { /* column already exists */ }
+  try {
+    db.run("ALTER TABLE jobs ADD COLUMN employer_id INTEGER");
+  } catch { /* column already exists */ }
+
   db.run(`
     CREATE TABLE IF NOT EXISTS candidate_saved_jobs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,6 +102,44 @@ async function getDb(): Promise<SqlJsDatabase> {
       job_url TEXT NOT NULL,
       saved_at TEXT DEFAULT (datetime('now')),
       UNIQUE(candidate_id, job_url)
+    )
+  `);
+
+  // Employer tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS employers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      company_name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS employer_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employer_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS employer_submitted_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employer_id INTEGER NOT NULL,
+      job_url TEXT NOT NULL,
+      job_id INTEGER,
+      status TEXT NOT NULL DEFAULT 'pending',
+      scraped_title TEXT,
+      scraped_company TEXT,
+      scraped_location TEXT,
+      scraped_description TEXT,
+      submitted_at TEXT DEFAULT (datetime('now')),
+      reviewed_at TEXT,
+      rejection_reason TEXT
     )
   `);
 
@@ -172,6 +218,9 @@ export interface Job {
   description?: string | null;
   domain?: string | null;
   company_url?: string | null;
+  // Employer verified fields
+  verified?: number;
+  employer_id?: number | null;
 }
 
 interface GetJobsParams {
@@ -322,6 +371,7 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM jobs j
@@ -429,6 +479,7 @@ export async function getRecentJobs(limit: number = 6): Promise<Job[]> {
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM jobs j
@@ -466,6 +517,7 @@ export async function getFeaturedJobs(): Promise<Job[]> {
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM jobs j
@@ -775,6 +827,7 @@ export async function getSavedJobs(candidateId: number): Promise<Job[]> {
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM candidate_saved_jobs csj
@@ -799,4 +852,228 @@ export async function getSavedJobs(candidateId: number): Promise<Job[]> {
   }
 
   return jobs;
+}
+
+// ── Employer queries ──
+
+export interface Employer {
+  id: number;
+  name: string;
+  email: string;
+  company_name: string;
+  created_at: string;
+}
+
+export interface EmployerSubmission {
+  id: number;
+  employer_id: number;
+  job_url: string;
+  job_id: number | null;
+  status: string;
+  scraped_title: string | null;
+  scraped_company: string | null;
+  scraped_location: string | null;
+  scraped_description: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  verified?: number;
+  employer_name?: string;
+  employer_company?: string;
+}
+
+function rowToObject(columns: string[], row: unknown[]): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  columns.forEach((col, i) => { obj[col] = row[i]; });
+  return obj;
+}
+
+export async function createEmployer(
+  name: string,
+  email: string,
+  company_name: string
+): Promise<number> {
+  const database = await getDb();
+  database.run(
+    "INSERT INTO employers (name, email, company_name) VALUES (?, ?, ?)",
+    [name, email.toLowerCase().trim(), company_name]
+  );
+  const result = database.exec("SELECT last_insert_rowid()");
+  forceSave();
+  return result[0].values[0][0] as number;
+}
+
+export async function getEmployerByEmail(email: string): Promise<Employer | null> {
+  const database = await getDb();
+  const result = database.exec("SELECT * FROM employers WHERE email = ?", [email.toLowerCase().trim()]);
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  return rowToObject(result[0].columns, result[0].values[0]) as unknown as Employer;
+}
+
+export async function getEmployerById(id: number): Promise<Employer | null> {
+  const database = await getDb();
+  const result = database.exec("SELECT * FROM employers WHERE id = ?", [id]);
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  return rowToObject(result[0].columns, result[0].values[0]) as unknown as Employer;
+}
+
+export async function createEmployerSession(
+  employer_id: number,
+  token: string,
+  expires_at: string
+): Promise<void> {
+  const database = await getDb();
+  database.run(
+    "INSERT INTO employer_sessions (employer_id, token, expires_at) VALUES (?, ?, ?)",
+    [employer_id, token, expires_at]
+  );
+  forceSave();
+}
+
+export async function getEmployerBySessionToken(token: string): Promise<Employer | null> {
+  const database = await getDb();
+  const result = database.exec(
+    `SELECT e.* FROM employers e
+     JOIN employer_sessions es ON es.employer_id = e.id
+     WHERE es.token = ? AND es.expires_at > datetime('now')`,
+    [token]
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  return rowToObject(result[0].columns, result[0].values[0]) as unknown as Employer;
+}
+
+export async function deleteEmployerSession(token: string): Promise<void> {
+  const database = await getDb();
+  database.run("DELETE FROM employer_sessions WHERE token = ?", [token]);
+  forceSave();
+}
+
+export async function createEmployerSubmission(
+  employer_id: number,
+  job_url: string,
+  scraped_title: string | null,
+  scraped_company: string | null,
+  scraped_location: string | null,
+  scraped_description: string | null,
+  job_id?: number | null
+): Promise<number> {
+  const database = await getDb();
+  database.run(
+    `INSERT INTO employer_submitted_jobs (employer_id, job_url, job_id, scraped_title, scraped_company, scraped_location, scraped_description)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [employer_id, job_url, job_id ?? null, scraped_title, scraped_company, scraped_location, scraped_description]
+  );
+  const result = database.exec("SELECT last_insert_rowid()");
+  forceSave();
+  return result[0].values[0][0] as number;
+}
+
+export async function getEmployerSubmissions(employer_id: number): Promise<EmployerSubmission[]> {
+  const database = await getDb();
+  const result = database.exec(
+    `SELECT esj.*, COALESCE(j.verified, 0) as verified
+     FROM employer_submitted_jobs esj
+     LEFT JOIN jobs j ON esj.job_id = j.id
+     WHERE esj.employer_id = ?
+     ORDER BY esj.submitted_at DESC`,
+    [employer_id]
+  );
+  if (result.length === 0) return [];
+  return result[0].values.map(row =>
+    rowToObject(result[0].columns, row) as unknown as EmployerSubmission
+  );
+}
+
+export async function getEmployerSubmissionById(id: number): Promise<EmployerSubmission | null> {
+  const database = await getDb();
+  const result = database.exec("SELECT * FROM employer_submitted_jobs WHERE id = ?", [id]);
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  return rowToObject(result[0].columns, result[0].values[0]) as unknown as EmployerSubmission;
+}
+
+export async function getAllPendingSubmissions(): Promise<EmployerSubmission[]> {
+  const database = await getDb();
+  const result = database.exec(
+    `SELECT esj.*, e.name as employer_name, e.company_name as employer_company
+     FROM employer_submitted_jobs esj
+     JOIN employers e ON esj.employer_id = e.id
+     WHERE esj.status = 'pending'
+     ORDER BY esj.submitted_at DESC
+     UNION ALL
+     SELECT esj.*, e.name as employer_name, e.company_name as employer_company
+     FROM employer_submitted_jobs esj
+     JOIN employers e ON esj.employer_id = e.id
+     WHERE esj.status != 'pending'
+     ORDER BY esj.reviewed_at DESC
+     LIMIT 50`
+  );
+  if (result.length === 0) return [];
+  return result[0].values.map(row =>
+    rowToObject(result[0].columns, row) as unknown as EmployerSubmission
+  );
+}
+
+export async function updateSubmissionJobId(submissionId: number, jobId: number): Promise<void> {
+  const database = await getDb();
+  database.run("UPDATE employer_submitted_jobs SET job_id = ? WHERE id = ?", [jobId, submissionId]);
+  forceSave();
+}
+
+export async function approveSubmission(id: number): Promise<void> {
+  const database = await getDb();
+  database.run(
+    "UPDATE employer_submitted_jobs SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?",
+    [id]
+  );
+  // If job_id exists, set verified and employer_id on the job
+  const sub = database.exec("SELECT job_id, employer_id FROM employer_submitted_jobs WHERE id = ?", [id]);
+  if (sub.length > 0 && sub[0].values.length > 0) {
+    const jobId = sub[0].values[0][0] as number | null;
+    const employerId = sub[0].values[0][1] as number;
+    if (jobId) {
+      database.run("UPDATE jobs SET verified = 1, employer_id = ? WHERE id = ?", [employerId, jobId]);
+    }
+  }
+  forceSave();
+}
+
+export async function rejectSubmission(id: number, reason?: string): Promise<void> {
+  const database = await getDb();
+  database.run(
+    "UPDATE employer_submitted_jobs SET status = 'rejected', reviewed_at = datetime('now'), rejection_reason = ? WHERE id = ?",
+    [reason || null, id]
+  );
+  forceSave();
+}
+
+export async function getOrCreateJobFromUrl(
+  url: string,
+  scraped_title: string | null,
+  scraped_company: string | null,
+  scraped_location: string | null,
+  scraped_description: string | null
+): Promise<{ job_id: number; was_duplicate: boolean }> {
+  const database = await getDb();
+
+  // Check if job URL already exists
+  const existing = database.exec("SELECT id FROM jobs WHERE url = ?", [url]);
+  if (existing.length > 0 && existing[0].values.length > 0) {
+    return { job_id: existing[0].values[0][0] as number, was_duplicate: true };
+  }
+
+  // Create new job with status='open'
+  database.run(
+    `INSERT INTO jobs (title, company, location, url, status, description_snippet, first_seen_at)
+     VALUES (?, ?, ?, ?, 'open', ?, datetime('now'))`,
+    [
+      scraped_title || "Untitled Role",
+      scraped_company || "Unknown Company",
+      scraped_location || null,
+      url,
+      scraped_description ? scraped_description.slice(0, 500) : null,
+    ]
+  );
+  const result = database.exec("SELECT last_insert_rowid()");
+  forceSave();
+  return { job_id: result[0].values[0][0] as number, was_duplicate: false };
 }

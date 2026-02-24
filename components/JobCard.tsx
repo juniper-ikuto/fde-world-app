@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, ExternalLink, MapPin } from "lucide-react";
+import { Heart, ExternalLink, MapPin, Crown } from "lucide-react";
 import { cn, timeAgo, isHot, isNew, isDiscovered, extractDomain, getSourceLabel, getFundingBadgeColors } from "@/lib/utils";
 import { BetaBadge } from "./BetaBadge";
 import type { Job } from "@/lib/db";
@@ -166,6 +166,12 @@ export default function JobCard({
 
           {/* Badges row */}
           <div className="flex flex-wrap items-center gap-2 mt-3">
+            {job.verified === 1 && job.employer_id && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-full border border-amber-200">
+                <Crown className="w-3 h-3" />
+                Direct from {job.company}
+              </span>
+            )}
             {jobIsHot && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-orange-700 bg-orange-50 rounded-full border border-orange-200">
                 🔥 Hot

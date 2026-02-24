@@ -138,6 +138,12 @@ export default function Nav() {
           ) : (
             <>
               <Link
+                href="/employers"
+                className="text-sm text-text-tertiary hover:text-text-secondary transition-colors duration-150"
+              >
+                For employers →
+              </Link>
+              <Link
                 href="/auth"
                 className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
               >
@@ -224,6 +230,13 @@ export default function Nav() {
                     className="block px-3 py-2 text-sm font-medium text-accent"
                   >
                     Join free →
+                  </Link>
+                  <Link
+                    href="/employers"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2 text-sm text-text-tertiary"
+                  >
+                    For employers →
                   </Link>
                 </>
               )}
