@@ -19,12 +19,6 @@ interface Filters {
   companies: string[];
 }
 
-interface CandidateInfo {
-  id: number;
-  name: string | null;
-  email: string;
-}
-
 function FeedContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -37,7 +31,7 @@ function FeedContent() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [savedUrls, setSavedUrls] = useState<Set<string>>(new Set());
-  const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const [filters, setFilters] = useState<Filters>({
@@ -61,7 +55,7 @@ function FeedContent() {
         }
         const data = await res.json();
         setSavedUrls(new Set(data.savedUrls));
-        setCandidate({ id: 0, name: null, email: "" });
+        setIsAuthenticated(true);
       } catch {
         router.push("/signup");
       }
@@ -126,7 +120,7 @@ function FeedContent() {
   };
 
   const handleSave = async (jobUrl: string) => {
-    if (!candidate) return;
+    if (!isAuthenticated) return;
     setSavedUrls((prev) => { const next = new Set(Array.from(prev)); next.add(jobUrl); return next; });
     try {
       await fetch("/api/saved", {
@@ -144,7 +138,7 @@ function FeedContent() {
   };
 
   const handleUnsave = async (jobUrl: string) => {
-    if (!candidate) return;
+    if (!isAuthenticated) return;
     setSavedUrls((prev) => {
       const next = new Set(Array.from(prev));
       next.delete(jobUrl);
@@ -173,7 +167,7 @@ function FeedContent() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      <Nav candidate={candidate} />
+      <Nav />
 
       <div className="max-w-container mx-auto px-4 sm:px-6 py-6">
         <div className="flex gap-8">
@@ -238,7 +232,7 @@ function FeedContent() {
                       onSave={handleSave}
                       onUnsave={handleUnsave}
                       onClick={setSelectedJob}
-                      isAuthenticated={!!candidate}
+                      isAuthenticated={isAuthenticated}
                     />
                   ))}
                 </div>

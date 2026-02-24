@@ -288,10 +288,6 @@ export default function AccountPage() {
     setSkills((prev) => prev.filter((s) => s !== skill));
   };
 
-  const candidateForNav = profile
-    ? { id: profile.id, name: profile.name, email: profile.email }
-    : null;
-
   const memberSince = profile?.created_at
     ? new Date(profile.created_at + "Z").toLocaleDateString("en-US", {
         month: "long",
@@ -303,7 +299,7 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      <Nav candidate={candidateForNav} />
+      <Nav />
 
       <div className="max-w-container mx-auto px-4 sm:px-6 py-6">
         <div className="max-w-[600px] mx-auto">

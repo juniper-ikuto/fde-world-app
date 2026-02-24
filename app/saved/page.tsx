@@ -9,50 +9,25 @@ import JobDrawer from "@/components/JobDrawer";
 import type { Job } from "@/lib/db";
 import Link from "next/link";
 
-interface CandidateInfo {
-  id: number;
-  name: string | null;
-  email: string;
-}
-
 export default function SavedPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [savedUrls, setSavedUrls] = useState<Set<string>>(new Set());
-  const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
 
   useEffect(() => {
     const loadSaved = async () => {
       try {
-        // Check auth
-        const savedRes = await fetch("/api/saved");
-        if (!savedRes.ok) {
+        const res = await fetch("/api/saved/jobs");
+        if (!res.ok) {
           router.push("/signup");
           return;
         }
-
-        const savedData = await savedRes.json();
-        const urls = savedData.savedUrls as string[];
-        setSavedUrls(new Set(urls));
-        setCandidate({ id: 0, name: null, email: "" });
-
-        // Fetch job details for saved URLs
-        if (urls.length > 0) {
-          // Fetch all jobs and filter client-side for now
-          const params = new URLSearchParams();
-          params.set("limit", "50");
-          params.set("page", "1");
-          const jobsRes = await fetch(`/api/jobs?${params}`);
-          const jobsData = await jobsRes.json();
-
-          const savedSet = new Set(urls);
-          const savedJobs = jobsData.jobs.filter((j: Job) =>
-            savedSet.has(j.url)
-          );
-          setJobs(savedJobs);
-        }
+        const data = await res.json();
+        const fetchedJobs: Job[] = data.jobs || [];
+        setJobs(fetchedJobs);
+        setSavedUrls(new Set(fetchedJobs.map((j) => j.url)));
       } catch {
         router.push("/signup");
       } finally {
@@ -85,7 +60,7 @@ export default function SavedPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      <Nav candidate={candidate} />
+      <Nav />
 
       <div className="max-w-container mx-auto px-4 sm:px-6 py-6">
         <div className="max-w-[800px] mx-auto">

@@ -1,28 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bookmark, Menu, X, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface NavProps {
-  candidate?: {
-    id: number;
-    name: string | null;
-    email: string;
-  } | null;
+interface CandidateInfo {
+  id: number;
+  name: string | null;
+  email: string;
 }
 
-export default function Nav({ candidate }: NavProps) {
+export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/account")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.email) setCandidate({ id: data.id, name: data.name, email: data.email });
+      })
+      .catch(() => {});
+  }, [pathname]); // re-fetch on navigation so sign-in/out reflects immediately
+
   const isAuthenticated = !!candidate;
 
   const handleSignOut = async () => {
     await fetch("/api/auth/signout", { method: "POST" });
+    setCandidate(null);
     router.push("/");
     router.refresh();
   };
