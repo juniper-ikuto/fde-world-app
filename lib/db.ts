@@ -175,9 +175,12 @@ async function getDb(): Promise<SqlJsDatabase> {
       role_extracted TEXT,
       ai_reasoning TEXT,
       is_target_stage INTEGER,
-      discovered_at TEXT
+      discovered_at TEXT,
+      published INTEGER DEFAULT 1
     )
   `);
+  // Migration: add published column if not present (for existing DBs)
+  try { db.run(`ALTER TABLE signals ADD COLUMN published INTEGER DEFAULT 1`); } catch (_) {}
 
   saveDb();
   return db;
@@ -1352,14 +1355,14 @@ export async function upsertSignals(
           text = ?, created_at = ?, url = ?, matched_query = ?,
           score = ?, account_type = ?, company_name = ?,
           role_extracted = ?, ai_reasoning = ?, is_target_stage = ?,
-          discovered_at = ?
+          discovered_at = ?, published = ?
         WHERE tweet_id = ?`,
         [
           s.author_username ?? null, s.author_name ?? null, s.author_followers ?? null,
           s.text ?? null, s.created_at ?? null, s.url ?? null, s.matched_query ?? null,
           s.score ?? null, s.account_type ?? null, s.company_name ?? null,
           s.role_extracted ?? null, s.ai_reasoning ?? null, s.is_target_stage ?? null,
-          s.discovered_at ?? null, s.tweet_id ?? null,
+          s.discovered_at ?? null, s.published ?? 1, s.tweet_id ?? null,
         ]
       );
       updated++;
@@ -1368,14 +1371,15 @@ export async function upsertSignals(
         `INSERT INTO signals (
           tweet_id, author_username, author_name, author_followers,
           text, created_at, url, matched_query, score, account_type,
-          company_name, role_extracted, ai_reasoning, is_target_stage, discovered_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          company_name, role_extracted, ai_reasoning, is_target_stage, discovered_at, published
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           s.tweet_id ?? null, s.author_username ?? null, s.author_name ?? null,
           s.author_followers ?? null, s.text ?? null, s.created_at ?? null,
           s.url ?? null, s.matched_query ?? null, s.score ?? null,
           s.account_type ?? null, s.company_name ?? null, s.role_extracted ?? null,
           s.ai_reasoning ?? null, s.is_target_stage ?? null, s.discovered_at ?? null,
+          s.published ?? 1,
         ]
       );
       inserted++;
@@ -1390,7 +1394,7 @@ export async function getSignalsFeed(limit: number = 20): Promise<Signal[]> {
   const database = await getDb();
   const result = database.exec(
     `SELECT * FROM signals
-     WHERE score >= 3
+     WHERE published = 1
      ORDER BY score DESC, discovered_at DESC
      LIMIT ?`,
     [limit]
