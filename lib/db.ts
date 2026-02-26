@@ -233,7 +233,6 @@ export const ROLE_LABELS: Record<string, string> = {
   impl: "Implementation Engineer",
   deployment: "Deployment Strategist",
   cse: "Customer Success Engineer",
-  other: "Other",
 };
 
 // ── Job queries ──
