@@ -10,27 +10,27 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          primary: "#FAFAFA",
-          secondary: "#F4F4F5",
-          elevated: "#FFFFFF",
+          primary:  "var(--bg-primary)",
+          secondary:"var(--bg-secondary)",
+          elevated: "var(--bg-elevated)",
         },
         text: {
-          primary: "#09090B",
-          secondary: "#71717A",
-          tertiary: "#A1A1AA",
+          primary:   "var(--text-primary)",
+          secondary: "var(--text-secondary)",
+          tertiary:  "var(--text-tertiary)",
         },
         accent: {
-          DEFAULT: "#4F46E5",
-          hover: "#4338CA",
-          light: "#EEF2FF",
+          DEFAULT: "var(--accent)",
+          hover:   "var(--accent-hover)",
+          light:   "var(--accent-light)",
         },
         border: {
-          DEFAULT: "#E4E4E7",
-          hover: "#D4D4D8",
+          DEFAULT: "var(--border)",
+          hover:   "var(--border-hover)",
         },
-        success: "#10B981",
-        warning: "#F59E0B",
-        destructive: "#EF4444",
+        success:     "var(--success)",
+        warning:     "var(--warning)",
+        destructive: "var(--destructive)",
         seed: {
           bg: "#FEF3C7",
           text: "#B45309",

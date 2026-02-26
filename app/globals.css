@@ -19,6 +19,23 @@
   --destructive: #EF4444;
 }
 
+[data-theme="dark"] {
+  --bg-primary:    #09090B;
+  --bg-secondary:  #111113;
+  --bg-elevated:   #18181B;
+  --text-primary:  #FAFAFA;
+  --text-secondary:#A1A1AA;
+  --text-tertiary: #52525B;
+  --accent:        #6366F1;
+  --accent-hover:  #818CF8;
+  --accent-light:  #1E1B4B;
+  --border:        #27272A;
+  --border-hover:  #3F3F46;
+  --success:       #10B981;
+  --warning:       #F59E0B;
+  --destructive:   #EF4444;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -139,6 +156,10 @@ body {
   transform: translateY(-4px);
   box-shadow: 0 0 0 1px rgba(79,70,229,0.22), 0 20px 48px rgba(79,70,229,0.12);
   border-color: rgba(79, 70, 229, 0.28);
+}
+[data-theme="dark"] .glass-card {
+  background: rgba(24, 24, 27, 0.55);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 /* ── Card hover (lightweight — for job feed cards) ─────── */

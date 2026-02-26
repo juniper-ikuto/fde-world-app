@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bookmark, Menu, X, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "./ThemeToggle";
 
 interface CandidateInfo {
   id: number;
@@ -119,6 +120,7 @@ export default function Nav() {
 
         {/* Right side */}
         <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
           {isAuthenticated ? (
             <div className="relative">
               <button
@@ -232,6 +234,10 @@ export default function Nav() {
             )}
 
             <div className="pt-2 border-t border-border mt-2">
+              <div className="flex items-center justify-between px-3 py-1 mb-1">
+                <span className="text-xs text-text-tertiary">Theme</span>
+                <ThemeToggle />
+              </div>
               {isAuthenticated ? (
                 <button
                   onClick={() => {
