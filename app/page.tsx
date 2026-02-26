@@ -38,7 +38,16 @@ export default async function LandingPage() {
         <div className="max-w-container mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-16 relative z-10">
           <div className="max-w-[620px]">
             <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-5">
-              Curated by Ikuto Group · FDE &amp; SE specialists
+              Curated by{" "}
+              <a
+                href="https://www.ikutogroup.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:opacity-75 transition-opacity duration-150"
+              >
+                Ikuto Group ↗
+              </a>{" "}
+              · FDE &amp; SE specialists
             </p>
             <h1 className="text-4xl sm:text-[52px] font-bold tracking-heading text-text-primary leading-[1.08]">
               Every FDE, SE and Solutions role.{" "}
