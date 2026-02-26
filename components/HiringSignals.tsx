@@ -166,6 +166,9 @@ export default function HiringSignals() {
               <span className="text-lg" aria-hidden="true">
                 📡
               </span>
+              <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 animate-pulse">
+                Building
+              </span>
             </div>
             <p className="text-sm text-text-secondary">
               Real-time posts from founders and companies actively hiring FDEs and
