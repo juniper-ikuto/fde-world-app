@@ -128,8 +128,12 @@ export default function SignupPage() {
             <h2 className="text-xl font-semibold tracking-heading text-text-primary mb-1">
               Join FDE World
             </h2>
-            <p className="text-sm text-text-secondary mb-6">
+            <p className="text-sm text-text-secondary mb-1">
               60 seconds. No password. Free forever.
+            </p>
+            <p className="text-xs text-text-tertiary mb-6">
+              You&apos;ll receive job alerts matching your preferences and occasional FDE World updates.{" "}
+              Unsubscribe any time.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
