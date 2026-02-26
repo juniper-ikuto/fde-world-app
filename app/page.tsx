@@ -99,7 +99,7 @@ export default async function LandingPage() {
         <div className="max-w-container mx-auto px-4 sm:px-6">
           <div className="grid sm:grid-cols-3 gap-8 max-w-[860px]">
             <ValueProp
-              heading="Curated, not scraped"
+              heading="FDE &amp; SE. Nothing else."
               body="Every role is client-facing and technical. FDEs, SEs, Pre-Sales, TAMs, Implementation Engineers. Nothing else makes the cut."
             />
             <ValueProp
