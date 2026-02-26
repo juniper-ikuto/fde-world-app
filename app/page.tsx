@@ -153,7 +153,7 @@ export default async function LandingPage() {
       <HiringSignals />
 
       {/* ── Bottom CTA ────────────────────────────────────────────────── */}
-      <section className="relative bg-text-primary py-16 sm:py-20 overflow-hidden">
+      <section className="relative bg-[#09090B] py-16 sm:py-20 overflow-hidden">
         <div className="bubble animate-float-a w-[500px] h-[500px] top-[-150px] left-1/2 -translate-x-1/2 opacity-25"
           style={{ background: "radial-gradient(circle, rgba(79,70,229,0.4) 0%, transparent 70%)" }} />
         <div className="max-w-container mx-auto px-4 sm:px-6 text-center relative z-10">
