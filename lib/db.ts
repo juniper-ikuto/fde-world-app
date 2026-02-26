@@ -1333,6 +1333,7 @@ export interface Signal {
   ai_reasoning: string | null;
   is_target_stage: number;
   discovered_at: string;
+  published: number;
 }
 
 export async function upsertSignals(

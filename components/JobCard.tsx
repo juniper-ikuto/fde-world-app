@@ -68,9 +68,7 @@ export default function JobCard({
     <div
       onClick={() => onClick?.(job)}
       className={cn(
-        "group relative bg-bg-elevated border border-border rounded-md p-4 sm:p-5",
-        "transition-all duration-150 ease-out",
-        "hover:border-border-hover hover:shadow-md hover:-translate-y-px",
+        "card-hover group relative bg-bg-elevated border border-border p-4 sm:p-5",
         onClick && "cursor-pointer"
       )}
     >
@@ -232,7 +230,7 @@ export default function JobCard({
 
 export function JobCardSkeleton() {
   return (
-    <div className="bg-bg-elevated border border-border rounded-md p-4 sm:p-5">
+    <div className="bg-bg-elevated border border-border rounded-xl p-4 sm:p-5">
       <div className="flex gap-3 sm:gap-4">
         <div className="w-10 h-10 rounded-sm skeleton" />
         <div className="flex-1 space-y-3">

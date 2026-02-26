@@ -27,33 +27,33 @@ export default async function LandingPage() {
 
       {/* ── Hero ──────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
-        <div className="max-w-container mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-16">
-          <div className="max-w-[620px]">
+        {/* Liquid bubbles */}
+        <div className="bubble animate-float-a w-[520px] h-[520px] top-[-120px] right-[-80px]"
+          style={{ background: "radial-gradient(circle, rgba(79,70,229,0.28) 0%, transparent 70%)" }} />
+        <div className="bubble animate-float-b w-[360px] h-[360px] top-[60px] right-[220px]"
+          style={{ background: "radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)" }} />
+        <div className="bubble animate-float-c w-[260px] h-[260px] top-[30px] right-[520px]"
+          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.16) 0%, transparent 70%)" }} />
 
-            {/* Eyebrow */}
+        <div className="max-w-container mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-16 relative z-10">
+          <div className="max-w-[620px]">
             <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-5">
               Curated by Ikuto Group · FDE &amp; SE specialists
             </p>
-
-            {/* Headline */}
             <h1 className="text-4xl sm:text-[52px] font-bold tracking-heading text-text-primary leading-[1.08]">
               Every FDE, SE and Solutions role.{" "}
               <span className="text-accent">One place.</span>
             </h1>
-
-            {/* Subtext */}
             <p className="mt-5 text-lg text-text-secondary leading-relaxed max-w-[500px]">
               {stats.openJobs.toLocaleString()}+ open roles across{" "}
               {stats.companies.toLocaleString()}+ companies, updated daily. No noise,
               no generalist job board — just the roles that matter if you work in
               client-facing technical sales and delivery.
             </p>
-
-            {/* CTAs */}
             <div className="mt-8 flex flex-col sm:flex-row items-start gap-3">
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold text-sm rounded-md transition-colors duration-150"
+                className="btn-lift inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold text-sm rounded-xl transition-colors duration-150"
               >
                 Get free access
                 <ArrowRight className="w-4 h-4" />
@@ -67,15 +67,6 @@ export default async function LandingPage() {
             </div>
           </div>
         </div>
-
-        {/* Decorative gradient */}
-        <div
-          className="absolute top-0 right-0 w-[700px] h-[700px] pointer-events-none opacity-[0.035]"
-          style={{
-            background:
-              "radial-gradient(circle at 60% 40%, #4F46E5, transparent 65%)",
-          }}
-        />
       </section>
 
       {/* ── Role type chips ───────────────────────────────────────────── */}
@@ -141,13 +132,13 @@ export default async function LandingPage() {
 
             {/* Overlay */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center bg-bg-primary/90 backdrop-blur-sm rounded-lg px-8 py-6 border border-border shadow-lg">
+              <div className="text-center glass-card px-8 py-6 shadow-lg">
                 <p className="text-sm text-text-secondary mb-4">
                   Free access. No credit card. 60 seconds to sign up.
                 </p>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-semibold text-sm rounded-md transition-colors duration-150"
+                  className="btn-lift inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-semibold text-sm rounded-xl transition-colors duration-150"
                 >
                   See all {stats.openJobs.toLocaleString()} roles
                   <ArrowRight className="w-4 h-4" />
@@ -162,8 +153,10 @@ export default async function LandingPage() {
       <HiringSignals />
 
       {/* ── Bottom CTA ────────────────────────────────────────────────── */}
-      <section className="bg-text-primary py-16 sm:py-20">
-        <div className="max-w-container mx-auto px-4 sm:px-6 text-center">
+      <section className="relative bg-text-primary py-16 sm:py-20 overflow-hidden">
+        <div className="bubble animate-float-a w-[500px] h-[500px] top-[-150px] left-1/2 -translate-x-1/2 opacity-25"
+          style={{ background: "radial-gradient(circle, rgba(79,70,229,0.4) 0%, transparent 70%)" }} />
+        <div className="max-w-container mx-auto px-4 sm:px-6 text-center relative z-10">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-heading text-white mb-3">
             The FDE &amp; SE job board you&apos;ve been missing.
           </h2>
@@ -173,7 +166,7 @@ export default async function LandingPage() {
           </p>
           <Link
             href="/signup"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold text-sm rounded-md transition-colors duration-150"
+            className="btn-lift inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold text-sm rounded-xl transition-colors duration-150"
           >
             Get free access
             <ArrowRight className="w-4 h-4" />
@@ -219,7 +212,7 @@ export default async function LandingPage() {
 
 function ValueProp({ heading, body }: { heading: string; body: string }) {
   return (
-    <div>
+    <div className="glass-card p-6">
       <div className="w-8 h-0.5 bg-accent rounded-full mb-4" />
       <h3 className="text-base font-semibold text-text-primary mb-2">{heading}</h3>
       <p className="text-sm text-text-secondary leading-relaxed">{body}</p>
@@ -234,7 +227,7 @@ function TeaserCard({ job }: { job: Job }) {
   const ago = timeAgo(job.posted_date || job.first_seen_at);
 
   return (
-    <div className="bg-bg-elevated border border-border rounded-md p-4">
+    <div className="bg-bg-elevated border border-border rounded-xl p-4">
       <div className="flex gap-3">
         <div className="shrink-0">
           {logoUrl ? (

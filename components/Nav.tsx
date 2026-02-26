@@ -139,7 +139,7 @@ export default function Nav() {
                     className="fixed inset-0 z-40"
                     onClick={() => setProfileOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-bg-elevated border border-border rounded-md shadow-md z-50 py-1 animate-fade-in">
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-bg-elevated border border-border rounded-xl shadow-md z-50 py-1 animate-fade-in">
                     <div className="px-3 py-2 border-b border-border">
                       <p className="text-sm font-medium text-text-primary truncate">
                         {candidate?.name}
@@ -169,7 +169,7 @@ export default function Nav() {
               </Link>
               <Link
                 href="/signup"
-                className="text-sm font-medium text-white bg-accent hover:bg-accent-hover px-4 py-1.5 rounded-md transition-colors duration-150"
+                className="btn-lift text-sm font-medium text-white bg-accent hover:bg-accent-hover px-4 py-1.5 rounded-xl transition-colors duration-150"
               >
                 Join free
               </Link>
