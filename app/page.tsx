@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, MapPin } from "lucide-react";
 import Nav from "@/components/Nav";
+import HiringSignals from "@/components/HiringSignals";
 import {
   getJobStats,
   getRecentJobs,
@@ -165,6 +166,9 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Hiring Signals ───────────────────────────────────────────── */}
+      <HiringSignals />
 
       {/* ── Bottom CTA ────────────────────────────────────────────────── */}
       <section className="bg-text-primary py-16 sm:py-20">

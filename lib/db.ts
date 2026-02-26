@@ -157,6 +157,28 @@ async function getDb(): Promise<SqlJsDatabase> {
     )
   `);
 
+  // Hiring signals from X
+  db.run(`
+    CREATE TABLE IF NOT EXISTS signals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tweet_id TEXT UNIQUE,
+      author_username TEXT,
+      author_name TEXT,
+      author_followers INTEGER,
+      text TEXT,
+      created_at TEXT,
+      url TEXT,
+      matched_query TEXT,
+      score INTEGER,
+      account_type TEXT,
+      company_name TEXT,
+      role_extracted TEXT,
+      ai_reasoning TEXT,
+      is_target_stage INTEGER,
+      discovered_at TEXT
+    )
+  `);
+
   saveDb();
   return db;
 }
@@ -1279,4 +1301,95 @@ export async function consumeAdminToken(
   forceSave();
 
   return { email: result[0].values[0][0] as string };
+}
+
+// ── Signal queries ──
+
+export interface Signal {
+  id: number;
+  tweet_id: string;
+  author_username: string;
+  author_name: string;
+  author_followers: number;
+  text: string;
+  created_at: string;
+  url: string;
+  matched_query: string;
+  score: number;
+  account_type: string;
+  company_name: string | null;
+  role_extracted: string | null;
+  ai_reasoning: string | null;
+  is_target_stage: number;
+  discovered_at: string;
+}
+
+export async function upsertSignals(
+  signals: Partial<Signal>[]
+): Promise<{ inserted: number; updated: number }> {
+  const database = await getDb();
+  let inserted = 0;
+  let updated = 0;
+
+  for (const s of signals) {
+    const existing = database.exec(
+      "SELECT id FROM signals WHERE tweet_id = ?",
+      [s.tweet_id ?? null]
+    );
+
+    if (existing.length > 0 && existing[0].values.length > 0) {
+      database.run(
+        `UPDATE signals SET
+          author_username = ?, author_name = ?, author_followers = ?,
+          text = ?, created_at = ?, url = ?, matched_query = ?,
+          score = ?, account_type = ?, company_name = ?,
+          role_extracted = ?, ai_reasoning = ?, is_target_stage = ?,
+          discovered_at = ?
+        WHERE tweet_id = ?`,
+        [
+          s.author_username ?? null, s.author_name ?? null, s.author_followers ?? null,
+          s.text ?? null, s.created_at ?? null, s.url ?? null, s.matched_query ?? null,
+          s.score ?? null, s.account_type ?? null, s.company_name ?? null,
+          s.role_extracted ?? null, s.ai_reasoning ?? null, s.is_target_stage ?? null,
+          s.discovered_at ?? null, s.tweet_id ?? null,
+        ]
+      );
+      updated++;
+    } else {
+      database.run(
+        `INSERT INTO signals (
+          tweet_id, author_username, author_name, author_followers,
+          text, created_at, url, matched_query, score, account_type,
+          company_name, role_extracted, ai_reasoning, is_target_stage, discovered_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          s.tweet_id ?? null, s.author_username ?? null, s.author_name ?? null,
+          s.author_followers ?? null, s.text ?? null, s.created_at ?? null,
+          s.url ?? null, s.matched_query ?? null, s.score ?? null,
+          s.account_type ?? null, s.company_name ?? null, s.role_extracted ?? null,
+          s.ai_reasoning ?? null, s.is_target_stage ?? null, s.discovered_at ?? null,
+        ]
+      );
+      inserted++;
+    }
+  }
+
+  forceSave();
+  return { inserted, updated };
+}
+
+export async function getSignalsFeed(limit: number = 20): Promise<Signal[]> {
+  const database = await getDb();
+  const result = database.exec(
+    `SELECT * FROM signals
+     WHERE score >= 3
+     ORDER BY score DESC, discovered_at DESC
+     LIMIT ?`,
+    [limit]
+  );
+
+  if (result.length === 0) return [];
+  return result[0].values.map(
+    (row) => rowToObject(result[0].columns, row) as unknown as Signal
+  );
 }
