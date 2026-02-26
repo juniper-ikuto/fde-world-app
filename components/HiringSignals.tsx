@@ -114,9 +114,12 @@ function SignalCard({ signal }: { signal: Signal }) {
   );
 }
 
+const PAGE_SIZE = 6;
+
 export default function HiringSignals() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,24 +150,34 @@ export default function HiringSignals() {
   // Don't render section if no signals and done loading
   if (!loading && signals.length === 0) return null;
 
+  const shown = signals.slice(0, visible);
+  const hasMore = visible < signals.length;
+
   return (
     <section className="py-16 sm:py-20 border-t border-border">
       <div className="max-w-container mx-auto px-4 sm:px-6">
         {/* Heading */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl font-semibold tracking-heading text-text-primary">
-              Hiring signals from X
-            </h2>
-            <span className="text-lg" aria-hidden="true">
-              📡
-            </span>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl font-semibold tracking-heading text-text-primary">
+                Hiring signals from X
+              </h2>
+              <span className="text-lg" aria-hidden="true">
+                📡
+              </span>
+            </div>
+            <p className="text-sm text-text-secondary">
+              Real-time posts from founders and companies actively hiring FDEs and
+              Solutions Engineers.
+            </p>
+            <p className="text-[11px] text-text-tertiary mt-1">Powered by X</p>
           </div>
-          <p className="text-sm text-text-secondary">
-            Real-time posts from founders and companies actively hiring FDEs and
-            Solutions Engineers.
-          </p>
-          <p className="text-[11px] text-text-tertiary mt-1">Powered by X</p>
+          {!loading && signals.length > 0 && (
+            <span className="text-xs text-text-tertiary shrink-0 mt-1">
+              {signals.length} signal{signals.length !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
 
         {/* Loading state */}
@@ -186,11 +199,33 @@ export default function HiringSignals() {
 
         {/* Signal cards */}
         {!loading && signals.length > 0 && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {signals.map((signal) => (
-              <SignalCard key={signal.tweet_id} signal={signal} />
-            ))}
-          </div>
+          <>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {shown.map((signal) => (
+                <SignalCard key={signal.tweet_id} signal={signal} />
+              ))}
+            </div>
+
+            {/* Load more / Show less */}
+            <div className="mt-6 flex items-center justify-center gap-4">
+              {hasMore && (
+                <button
+                  onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                  className="text-sm font-medium text-accent hover:text-accent-hover transition-colors duration-150 border border-border rounded-md px-4 py-2 hover:bg-bg-elevated"
+                >
+                  Show more ({signals.length - visible} remaining)
+                </button>
+              )}
+              {visible > PAGE_SIZE && (
+                <button
+                  onClick={() => setVisible(PAGE_SIZE)}
+                  className="text-sm text-text-tertiary hover:text-text-secondary transition-colors duration-150"
+                >
+                  Show less
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </section>
