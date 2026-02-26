@@ -25,6 +25,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.dataset.theme='dark'}}catch(e){}})()`,
           }}
         />
+        {/* Umami analytics — privacy-first, no cookies */}
+        <script
+          async
+          src="https://umami-production-e13e.up.railway.app/script.js"
+          data-website-id="7637b1a8-b348-4d69-b326-9fb94da25cf6"
+        />
       </head>
       <body className="font-sans bg-bg-primary text-text-primary min-h-screen">
         {children}
