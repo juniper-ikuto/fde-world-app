@@ -209,13 +209,19 @@ export const ROLE_KEYWORDS: Record<string, string[]> = {
   presales: ["pre-sales", "presales", "sales engineer"],
   tam: [
     "technical account manager",
-    "customer success engineer",
     "customer engineer",
   ],
   impl: [
     "implementation engineer",
-    "deployment engineer",
     "integration engineer",
+  ],
+  deployment: [
+    "deployment strategist",
+    "deployment engineer",
+  ],
+  cse: [
+    "customer success engineer",
+    "customer success manager",
   ],
 };
 
@@ -225,6 +231,9 @@ export const ROLE_LABELS: Record<string, string> = {
   presales: "Pre-Sales / Sales Engineer",
   tam: "Technical Account Manager",
   impl: "Implementation Engineer",
+  deployment: "Deployment Strategist",
+  cse: "Customer Success Engineer",
+  other: "Other",
 };
 
 // ── Job queries ──

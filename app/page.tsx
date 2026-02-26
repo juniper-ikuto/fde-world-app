@@ -83,14 +83,14 @@ export default async function LandingPage() {
           <p className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-4">
             Browse by role type
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
             {Object.entries(ROLE_LABELS).map(([key, label]) => {
               const count = roleCounts[key] || 0;
               return (
                 <Link
                   key={key}
                   href={`/feed?role=${key}`}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-primary border border-border rounded-md text-sm hover:border-border-hover hover:bg-bg-secondary transition-all duration-150"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-primary border border-border rounded-md text-sm hover:border-border-hover hover:bg-bg-secondary transition-all duration-150 whitespace-nowrap shrink-0"
                 >
                   <span className="font-medium text-text-primary">{label}</span>
                   <span className="text-xs text-text-tertiary tabular-nums">
