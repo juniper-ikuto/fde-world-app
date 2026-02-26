@@ -155,11 +155,14 @@ export default function PrivacyPage() {
 
             <div>
               <h2 className="text-base font-semibold text-text-primary mb-2">
-                Cookies
+                Cookies &amp; analytics
               </h2>
               <p>
-                We use a single session cookie to keep you signed in. We do not use
-                any tracking, analytics, or advertising cookies.
+                We use a single session cookie to keep you signed in. For analytics,
+                we use Umami Analytics — a self-hosted, cookieless tool that collects
+                only anonymised, aggregated data (page views, referrer, country,
+                browser). No personal information is collected through analytics, and
+                no consent banner is required.
               </p>
             </div>
 
