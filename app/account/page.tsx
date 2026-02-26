@@ -48,7 +48,6 @@ interface Profile {
   name: string | null;
   role_types: string | null;
   remote_pref: string | null;
-  alert_freq: string | null;
   created_at: string | null;
   linkedin_url: string | null;
   linkedin_verified: number;
@@ -98,7 +97,6 @@ export default function AccountPage() {
   const [name, setName] = useState("");
   const [roleTypes, setRoleTypes] = useState<string[]>([]);
   const [remotePref, setRemotePref] = useState("open");
-  const [alertFreq, setAlertFreq] = useState("weekly");
   const [currentRole, setCurrentRole] = useState("");
   const [currentCompany, setCurrentCompany] = useState("");
   const [yearsExperience, setYearsExperience] = useState("");
@@ -136,7 +134,6 @@ export default function AccountPage() {
         }
         setRoleTypes(parsed);
         setRemotePref(data.remote_pref || "open");
-        setAlertFreq(data.alert_freq || "weekly");
         setCurrentRole(data.current_role || "");
         setCurrentCompany(data.current_company || "");
         setYearsExperience(data.years_experience != null ? String(data.years_experience) : "");
@@ -176,7 +173,6 @@ export default function AccountPage() {
           name,
           role_types: roleTypes,
           remote_pref: remotePref,
-          alert_freq: alertFreq,
           current_role: currentRole,
           current_company: currentCompany,
           years_experience: yearsExperience ? Number(yearsExperience) : undefined,
@@ -666,21 +662,6 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                {/* Alert frequency */}
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">
-                    Alert frequency
-                  </label>
-                  <select
-                    value={alertFreq}
-                    onChange={(e) => setAlertFreq(e.target.value)}
-                    className="px-3 py-1.5 text-sm rounded-md border border-border bg-bg-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="never">Never</option>
-                  </select>
-                </div>
               </section>
 
               {/* CV section */}
