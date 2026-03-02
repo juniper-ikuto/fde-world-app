@@ -111,6 +111,28 @@ export async function POST(request: NextRequest) {
       surname.trim()
     );
 
+    // Notify Dave on new signups via Telegram
+    if (candidate.isNew) {
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      const chatId = process.env.TELEGRAM_CHAT_ID;
+      if (botToken && chatId) {
+        const fullName = [name.trim(), surname.trim()].filter(Boolean).join(" ");
+        const roles = roleTypes.length > 0 ? roleTypes.join(", ") : "not specified";
+        const locStr = location ? ` 📍 ${location}` : "";
+        const msgText = `🎉 *New FDE World signup!*\n\n*${fullName}*${locStr}\n📧 ${email.toLowerCase().trim()}\n🎯 ${roles}${linkedinUrl ? `\n🔗 [LinkedIn](${linkedinUrl})` : ""}${cvFilename ? `\n📄 CV: ${cvFilename}` : ""}`;
+        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: msgText,
+            parse_mode: "Markdown",
+            disable_web_page_preview: true,
+          }),
+        }).catch(() => {}); // fire and forget — never block signup
+      }
+    }
+
     // Generate verification token
     const token = generateToken();
     const expiresAt = getTokenExpiry();

@@ -649,7 +649,7 @@ export async function upsertCandidate(
   cvPath?: string,
   location?: string,
   surname?: string
-): Promise<Candidate> {
+): Promise<Candidate & { isNew: boolean }> {
   const database = await getDb();
   const roleTypesJson = JSON.stringify(roleTypes);
 
@@ -659,7 +659,9 @@ export async function upsertCandidate(
     [email]
   );
 
-  if (existing.length > 0 && existing[0].values.length > 0) {
+  const isNew = !(existing.length > 0 && existing[0].values.length > 0);
+
+  if (!isNew) {
     database.run(
       "UPDATE candidates SET name = ?, surname = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), location = COALESCE(?, location), last_active_at = datetime('now') WHERE email = ?",
       [name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null, email]
@@ -672,7 +674,8 @@ export async function upsertCandidate(
   }
 
   forceSave();
-  return getCandidateByEmail(email) as Promise<Candidate>;
+  const candidate = await getCandidateByEmail(email) as Candidate;
+  return { ...candidate, isNew };
 }
 
 export async function getCandidateByEmail(
