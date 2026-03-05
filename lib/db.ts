@@ -1439,38 +1439,50 @@ export async function getCompanyInsights(
     [name]
   );
 
-  // Strategy 2: LIKE fuzzy match
+  // Strategy 2: Suffix-stripped exact match ("Anthropic, Inc." → "Anthropic")
   if (result.length === 0) {
-    result = database.exec(
-      `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
-              industries, hq_location, investors, description
-       FROM company_enrichment
-       WHERE LOWER(company_name) LIKE LOWER(?)
-       LIMIT 1`,
-      [`%${name}%`]
-    );
-  }
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(
+          /\b(inc|ltd|llc|llp|corp|corporation|limited|co|company|group|holdings|technologies|technology|solutions|services|labs|lab|ai|hq)\b/g,
+          ""
+        )
+        .replace(/\s+/g, " ")
+        .trim();
 
-  // Strategy 3: Slug match — strip punctuation and common suffixes
-  if (result.length === 0) {
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
-      .replace(/\b(inc|ltd|llc|corp|corporation|limited|co|company|group|holdings)\b/g, "")
-      .trim()
-      .replace(/\s+/g, " ");
-
-    if (slug) {
+    const normalizedName = normalize(name);
+    if (normalizedName) {
       result = database.exec(
         `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
                 industries, hq_location, investors, description
          FROM company_enrichment
-         WHERE TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+         WHERE TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                  LOWER(company_name),
-                 ',',''), '.',''), '''',''), '!',''), '&',''), '-',''), '(',''), ')',''))
-               LIKE ?
+                 ',', ' '), '.', ' '), '''', ''), '!', ''), '&', ' '), '-', ' '), '(', ''), ')', ''),
+                 'inc', ''), 'ltd', ''))
+               = ?
          LIMIT 1`,
-        [`%${slug}%`]
+        [normalizedName]
+      );
+    }
+  }
+
+  // Strategy 3: Slug match — only match whole name as prefix/suffix, not substring
+  if (result.length === 0) {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+    if (slug && slug.length >= 4) {
+      result = database.exec(
+        `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
+                industries, hq_location, investors, description
+         FROM company_enrichment
+         WHERE REPLACE(REPLACE(REPLACE(LOWER(company_name), ' ', ''), '-', ''), '.', '') = ?
+         LIMIT 1`,
+        [slug]
       );
     }
   }
