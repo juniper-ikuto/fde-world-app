@@ -1425,9 +1425,42 @@ export interface CompanyInsight {
 }
 
 export async function getCompanyInsights(
-  name: string
+  name: string,
+  linkedinSlug?: string
 ): Promise<CompanyInsight | null> {
   const database = await getDb();
+
+  // Strategy 0: LinkedIn company slug match (most reliable — from /company/slug/ URL)
+  if (linkedinSlug && linkedinSlug.length >= 2) {
+    const slugNorm = linkedinSlug.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const result = database.exec(
+      `SELECT company_name, funding_stage, yc_batch, total_raised, last_raised, last_funded_date,
+              industries, hq_location, investors, description
+       FROM company_enrichment
+       WHERE REPLACE(REPLACE(LOWER(COALESCE(matched_slug, domain, '')), '-', ''), '.', '') = ?
+          OR REPLACE(REPLACE(LOWER(COALESCE(domain, '')), '-', ''), '.', '') LIKE ?
+       LIMIT 1`,
+      [slugNorm, `${slugNorm}%`]
+    );
+    if (result.length > 0 && result[0].values.length > 0) {
+      const row = rowToObject(result[0].columns, result[0].values[0]);
+      return {
+        found: true,
+        company_name: row.company_name as string,
+        funding_stage: (row.funding_stage as string) || null,
+        yc_batch: (row.yc_batch as string) || null,
+        total_raised: (row.total_raised as string) || null,
+        last_raised: (row.last_raised as string) || null,
+        last_funded_date: (row.last_funded_date as string) || null,
+        industries: (row.industries as string) || null,
+        hq_location: (row.hq_location as string) || null,
+        investors: (row.investors as string) || null,
+        description: (row.description as string) || null,
+      };
+    }
+  }
+
+  if (!name) return null;
 
   // Strategy 1: Exact match (case insensitive)
   let result = database.exec(
@@ -1465,24 +1498,6 @@ export async function getCompanyInsights(
                = ?
          LIMIT 1`,
         [normalizedName]
-      );
-    }
-  }
-
-  // Strategy 3: Slug match — only match whole name as prefix/suffix, not substring
-  if (result.length === 0) {
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "");
-
-    if (slug && slug.length >= 4) {
-      result = database.exec(
-        `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
-                industries, hq_location, investors, description
-         FROM company_enrichment
-         WHERE REPLACE(REPLACE(REPLACE(LOWER(company_name), ' ', ''), '-', ''), '.', '') = ?
-         LIMIT 1`,
-        [slug]
       );
     }
   }

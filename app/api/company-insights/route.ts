@@ -15,16 +15,17 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   const name = request.nextUrl.searchParams.get("name");
+  const slug = request.nextUrl.searchParams.get("slug"); // LinkedIn company URL slug
 
-  if (!name) {
+  if (!name && !slug) {
     return NextResponse.json(
-      { error: "Missing required query parameter: name" },
+      { error: "Missing required query parameter: name or slug" },
       { status: 400, headers: CORS_HEADERS }
     );
   }
 
   try {
-    const insight = await getCompanyInsights(name);
+    const insight = await getCompanyInsights(name || "", slug || undefined);
 
     if (insight) {
       return NextResponse.json(insight, { headers: CORS_HEADERS });
