@@ -107,6 +107,8 @@ export function getFundingBadgeColors(stage: string | null): {
     return { bg: "bg-series-b-bg", text: "text-series-b-text" };
   if (lower.includes("series c") || lower.includes("series d") || lower.includes("series e"))
     return { bg: "bg-series-c-bg", text: "text-series-c-text" };
+  if (lower.startsWith("yc "))
+    return { bg: "bg-orange-100", text: "text-orange-700" };
 
   return null;
 }
