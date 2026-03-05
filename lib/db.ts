@@ -1414,6 +1414,7 @@ export interface CompanyInsight {
   found: true;
   company_name: string;
   funding_stage: string | null;
+  yc_batch: string | null;
   total_raised: string | null;
   last_raised: string | null;
   last_funded_date: string | null;
@@ -1481,6 +1482,7 @@ export async function getCompanyInsights(
     found: true,
     company_name: row.company_name as string,
     funding_stage: (row.funding_stage as string) || null,
+    yc_batch: (row.yc_batch as string) || null,
     total_raised: (row.total_raised as string) || null,
     last_raised: (row.last_raised as string) || null,
     last_funded_date: (row.last_funded_date as string) || null,
