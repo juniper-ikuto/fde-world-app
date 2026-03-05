@@ -1409,3 +1409,84 @@ export async function getSignalsFeed(limit: number = 20): Promise<Signal[]> {
     (row) => rowToObject(result[0].columns, row) as unknown as Signal
   );
 }
+
+export interface CompanyInsight {
+  found: true;
+  company_name: string;
+  funding_stage: string | null;
+  total_raised: string | null;
+  last_raised: string | null;
+  last_funded_date: string | null;
+  industries: string | null;
+  hq_location: string | null;
+  investors: string | null;
+  description: string | null;
+}
+
+export async function getCompanyInsights(
+  name: string
+): Promise<CompanyInsight | null> {
+  const database = await getDb();
+
+  // Strategy 1: Exact match (case insensitive)
+  let result = database.exec(
+    `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
+            industries, hq_location, investors, description
+     FROM company_enrichment
+     WHERE LOWER(TRIM(company_name)) = LOWER(TRIM(?))
+     LIMIT 1`,
+    [name]
+  );
+
+  // Strategy 2: LIKE fuzzy match
+  if (result.length === 0) {
+    result = database.exec(
+      `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
+              industries, hq_location, investors, description
+       FROM company_enrichment
+       WHERE LOWER(company_name) LIKE LOWER(?)
+       LIMIT 1`,
+      [`%${name}%`]
+    );
+  }
+
+  // Strategy 3: Slug match — strip punctuation and common suffixes
+  if (result.length === 0) {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/\b(inc|ltd|llc|corp|corporation|limited|co|company|group|holdings)\b/g, "")
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (slug) {
+      result = database.exec(
+        `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
+                industries, hq_location, investors, description
+         FROM company_enrichment
+         WHERE TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 LOWER(company_name),
+                 ',',''), '.',''), '''',''), '!',''), '&',''), '-',''), '(',''), ')',''))
+               LIKE ?
+         LIMIT 1`,
+        [`%${slug}%`]
+      );
+    }
+  }
+
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  const row = rowToObject(result[0].columns, result[0].values[0]);
+  return {
+    found: true,
+    company_name: row.company_name as string,
+    funding_stage: (row.funding_stage as string) || null,
+    total_raised: (row.total_raised as string) || null,
+    last_raised: (row.last_raised as string) || null,
+    last_funded_date: (row.last_funded_date as string) || null,
+    industries: (row.industries as string) || null,
+    hq_location: (row.hq_location as string) || null,
+    investors: (row.investors as string) || null,
+    description: (row.description as string) || null,
+  };
+}
