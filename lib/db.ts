@@ -265,7 +265,6 @@ export interface Job {
   description?: string | null;
   domain?: string | null;
   company_url?: string | null;
-  ats_slug?: string | null;
   // Employer verified fields
   verified?: number;
   employer_id?: number | null;
@@ -405,7 +404,7 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
   const countSql = `
     SELECT COUNT(DISTINCT j.id)
     FROM jobs j
-    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) OR lower(company_name) = lower(j.company) ORDER BY CASE WHEN (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) THEN 0 ELSE 1 END LIMIT 1)
+    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1)
     WHERE ${whereClause}
   `;
   const countResult = database.exec(countSql, bindParams);
@@ -419,11 +418,11 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
-      j.verified, j.employer_id, j.ats_slug,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM jobs j
-    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) OR lower(company_name) = lower(j.company) ORDER BY CASE WHEN (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) THEN 0 ELSE 1 END LIMIT 1)
+    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1)
     WHERE ${whereClause}
     ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
@@ -454,7 +453,7 @@ export async function getJobByUrl(url: string): Promise<Job | null> {
       j.*, ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description as enrichment_desc, ce.domain
     FROM jobs j
-    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) OR lower(company_name) = lower(j.company) ORDER BY CASE WHEN (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) THEN 0 ELSE 1 END LIMIT 1)
+    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1)
     WHERE j.url = ?
   `,
     [url]
@@ -527,11 +526,11 @@ export async function getRecentJobs(limit: number = 6): Promise<Job[]> {
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
-      j.verified, j.employer_id, j.ats_slug,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM jobs j
-    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) OR lower(company_name) = lower(j.company) ORDER BY CASE WHEN (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) THEN 0 ELSE 1 END LIMIT 1)
+    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1)
     WHERE j.status = 'open'
     ORDER BY COALESCE(j.posted_date, j.first_seen_at) DESC
     LIMIT ?
@@ -565,11 +564,11 @@ export async function getFeaturedJobs(): Promise<Job[]> {
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
-      j.verified, j.employer_id, j.ats_slug,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM jobs j
-    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) OR lower(company_name) = lower(j.company) ORDER BY CASE WHEN (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) THEN 0 ELSE 1 END LIMIT 1)
+    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1)
     WHERE j.featured = 1 AND j.status = 'open'
     ORDER BY COALESCE(j.posted_date, j.first_seen_at) DESC
     LIMIT 4
@@ -881,12 +880,12 @@ export async function getSavedJobs(candidateId: number): Promise<Job[]> {
       j.posted_date, j.scraped_at, j.description_snippet,
       j.is_remote, j.salary_range, j.status, j.first_seen_at,
       j.last_seen_at, j.country, j.company_url,
-      j.verified, j.employer_id, j.ats_slug,
+      j.verified, j.employer_id,
       ce.funding_stage, ce.total_raised, ce.last_funded_date,
       ce.employee_count, ce.industries, ce.description, ce.domain
     FROM candidate_saved_jobs csj
     JOIN jobs j ON j.url = csj.job_url
-    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) OR lower(company_name) = lower(j.company) ORDER BY CASE WHEN (j.ats_slug IS NOT NULL AND j.ats_slug != '' AND matched_slug = j.ats_slug) THEN 0 ELSE 1 END LIMIT 1)
+    LEFT JOIN company_enrichment ce ON ce.id = (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1)
     WHERE csj.candidate_id = ?
     ORDER BY csj.saved_at DESC
   `,
