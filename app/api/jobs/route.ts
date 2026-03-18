@@ -3,6 +3,10 @@ import { getJobs } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+// ── 60s in-memory cache ──
+const cache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_TTL = 60_000; // 60 seconds
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -39,6 +43,13 @@ export async function GET(request: NextRequest) {
       ? excludeCompaniesRaw.filter((c) => c !== "__include__")
       : [];
 
+    // Cache key from sorted search params
+    const cacheKey = request.nextUrl.search || "default";
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return NextResponse.json(cached.data);
+    }
+
     const result = await getJobs({
       roleTypes,
       country,
@@ -53,6 +64,8 @@ export async function GET(request: NextRequest) {
       includeCompanies,
       freshness,
     });
+
+    cache.set(cacheKey, { data: result, ts: Date.now() });
 
     return NextResponse.json(result);
   } catch (error) {

@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['sql.js'],
+    serverComponentsExternalPackages: ['better-sqlite3'],
   },
   images: {
     remotePatterns: [
@@ -10,17 +10,6 @@ const nextConfig = {
         hostname: 'logo.clearbit.com',
       },
     ],
-  },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        path: false,
-        crypto: false,
-      };
-    }
-    return config;
   },
 };
 

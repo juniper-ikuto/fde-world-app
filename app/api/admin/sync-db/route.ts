@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import initSqlJs from "sql.js";
+import Database from "better-sqlite3";
 import { resetDb, DB_PATH } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -29,58 +29,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "DB too small — rejected" }, { status: 400 });
     }
 
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => path.join(process.cwd(), "public", file),
-    });
+    // Write incoming DB to a temp file (better-sqlite3 needs a file path)
+    const tmpPath = path.join(path.dirname(DB_PATH), "_sync_incoming.db");
+    fs.writeFileSync(tmpPath, Buffer.from(buf));
 
-    // Load incoming (scraper) DB
-    const incomingDb = new SQL.Database(new Uint8Array(buf));
+    const incomingDb = new Database(tmpPath, { readonly: true });
 
-    // Load or create existing Railway DB (preserves candidates)
+    // Ensure target directory exists
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-    const existingBuf = fs.existsSync(DB_PATH) ? fs.readFileSync(DB_PATH) : null;
-    const railwayDb = existingBuf
-      ? new SQL.Database(existingBuf)
-      : new SQL.Database();
+    // Close the main app DB so we can write to it
+    resetDb();
+
+    const railwayDb = new Database(DB_PATH);
+    railwayDb.pragma("journal_mode = WAL");
 
     // Copy scraper tables from incoming → railway DB
     for (const table of SCRAPER_TABLES) {
       try {
         // Get CREATE TABLE statement from incoming DB
-        const schema = incomingDb.exec(
-          `SELECT sql FROM sqlite_master WHERE type='table' AND name='${table}'`
-        );
-        if (!schema.length || !schema[0].values.length) continue;
-        const createSql = schema[0].values[0][0] as string;
+        const schema = incomingDb.prepare(
+          `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`
+        ).get(table) as { sql: string } | undefined;
+        if (!schema) continue;
 
         // Drop and recreate the table in railway DB
-        railwayDb.run(`DROP TABLE IF EXISTS ${table}`);
-        railwayDb.run(createSql);
+        railwayDb.exec(`DROP TABLE IF EXISTS ${table}`);
+        railwayDb.exec(schema.sql);
 
         // Copy all rows
-        const rows = incomingDb.exec(`SELECT * FROM ${table}`);
-        if (!rows.length) continue;
+        const rows = incomingDb.prepare(`SELECT * FROM ${table}`).all();
+        if (rows.length === 0) continue;
 
-        const cols = rows[0].columns.join(", ");
-        const placeholders = rows[0].columns.map(() => "?").join(", ");
-        const insertSql = `INSERT OR REPLACE INTO ${table} (${cols}) VALUES (${placeholders})`;
-        for (const row of rows[0].values) {
-          railwayDb.run(insertSql, row as (string | number | null)[]);
-        }
+        const cols = Object.keys(rows[0] as Record<string, unknown>);
+        const colNames = cols.join(", ");
+        const placeholders = cols.map(() => "?").join(", ");
+        const insertStmt = railwayDb.prepare(
+          `INSERT OR REPLACE INTO ${table} (${colNames}) VALUES (${placeholders})`
+        );
+
+        const insertAll = railwayDb.transaction((items: Record<string, unknown>[]) => {
+          for (const row of items) {
+            insertStmt.run(...cols.map((c) => row[c] ?? null));
+          }
+        });
+        insertAll(rows as Record<string, unknown>[]);
       } catch (e) {
         console.error(`Error syncing table ${table}:`, e);
       }
     }
 
-    // Write updated Railway DB back to disk
-    const updatedBuf = railwayDb.export();
-    fs.writeFileSync(DB_PATH, updatedBuf);
-
     incomingDb.close();
     railwayDb.close();
-    resetDb(); // reload in-memory DB on next request
+
+    // Clean up temp file
+    try { fs.unlinkSync(tmpPath); } catch { /* */ }
+
+    // resetDb already called above; next request will re-open
 
     return NextResponse.json({ ok: true, bytes: buf.byteLength, path: DB_PATH });
   } catch (err) {

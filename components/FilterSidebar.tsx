@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, SlidersHorizontal, X, Search, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ROLE_LABELS } from "@/lib/db";
+import { ROLE_LABELS } from "@/lib/constants";
 import { BetaBadge } from "./BetaBadge";
 
 interface Filters {

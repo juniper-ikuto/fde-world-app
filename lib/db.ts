@@ -1,34 +1,42 @@
-import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
+import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { ROLE_KEYWORDS } from "./constants";
+
+export { ROLE_KEYWORDS } from "./constants";
+export { ROLE_LABELS } from "./constants";
 
 const DB_PATH = path.resolve(
   process.cwd(),
   process.env.DB_PATH || "../scraper/jobs.db"
 );
 
-let db: SqlJsDatabase | null = null;
-let lastWriteTime = 0;
+let db: Database.Database | null = null;
 
 export function resetDb() {
-  db = null;
+  if (db) {
+    db.close();
+    db = null;
+  }
 }
 
 export { DB_PATH };
 
-async function getDb(): Promise<SqlJsDatabase> {
+function getDb(): Database.Database {
   if (db) return db;
 
-  const SQL = await initSqlJs({
-    // Load WASM from filesystem — works in both dev and production (Railway)
-    locateFile: (file: string) => path.join(process.cwd(), "public", file),
-  });
-  // Start with empty DB if file doesn't exist yet (first deploy before sync)
-  const buffer = fs.existsSync(DB_PATH) ? fs.readFileSync(DB_PATH) : undefined;
-  db = buffer ? new SQL.Database(buffer) : new SQL.Database();
+  // If the file doesn't exist yet (first deploy before sync), create it
+  if (!fs.existsSync(DB_PATH)) {
+    // Ensure parent dir exists
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
+
+  db = new Database(DB_PATH);
+  db.pragma("journal_mode = WAL");
 
   // Create candidate tables if they don't exist
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS candidates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
@@ -81,23 +89,23 @@ async function getDb(): Promise<SqlJsDatabase> {
     "ALTER TABLE candidates ADD COLUMN salary_currency TEXT DEFAULT 'GBP'",
     "ALTER TABLE candidates ADD COLUMN surname TEXT",
   ]) {
-    try { db.run(col); } catch { /* column already exists */ }
+    try { db.exec(col); } catch { /* column already exists */ }
   }
 
   // Migrate: add featured column to jobs table if it doesn't exist
   try {
-    db.run("ALTER TABLE jobs ADD COLUMN featured INTEGER DEFAULT 0");
+    db.exec("ALTER TABLE jobs ADD COLUMN featured INTEGER DEFAULT 0");
   } catch { /* column already exists */ }
 
   // Migrate: add verified and employer_id columns to jobs table
   try {
-    db.run("ALTER TABLE jobs ADD COLUMN verified INTEGER DEFAULT 0");
+    db.exec("ALTER TABLE jobs ADD COLUMN verified INTEGER DEFAULT 0");
   } catch { /* column already exists */ }
   try {
-    db.run("ALTER TABLE jobs ADD COLUMN employer_id INTEGER");
+    db.exec("ALTER TABLE jobs ADD COLUMN employer_id INTEGER");
   } catch { /* column already exists */ }
 
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS candidate_saved_jobs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       candidate_id INTEGER NOT NULL,
@@ -108,7 +116,7 @@ async function getDb(): Promise<SqlJsDatabase> {
   `);
 
   // Employer tables
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS employers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -118,7 +126,7 @@ async function getDb(): Promise<SqlJsDatabase> {
     )
   `);
 
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS employer_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       employer_id INTEGER NOT NULL,
@@ -128,7 +136,7 @@ async function getDb(): Promise<SqlJsDatabase> {
     )
   `);
 
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS employer_submitted_jobs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       employer_id INTEGER NOT NULL,
@@ -146,7 +154,7 @@ async function getDb(): Promise<SqlJsDatabase> {
   `);
 
   // Admin auth tokens
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS admin_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token_hash TEXT UNIQUE NOT NULL,
@@ -158,7 +166,7 @@ async function getDb(): Promise<SqlJsDatabase> {
   `);
 
   // Hiring signals from X
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS signals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tweet_id TEXT UNIQUE,
@@ -180,63 +188,12 @@ async function getDb(): Promise<SqlJsDatabase> {
     )
   `);
   // Migration: add published column if not present (for existing DBs)
-  try { db.run(`ALTER TABLE signals ADD COLUMN published INTEGER DEFAULT 1`); } catch (_) {}
+  try { db.exec(`ALTER TABLE signals ADD COLUMN published INTEGER DEFAULT 1`); } catch { /* */ }
 
-  saveDb();
   return db;
 }
 
-function saveDb() {
-  if (!db) return;
-  const now = Date.now();
-  if (now - lastWriteTime < 1000) return; // Debounce writes
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(DB_PATH, buffer);
-  lastWriteTime = now;
-}
-
-function forceSave() {
-  if (!db) return;
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(DB_PATH, buffer);
-  lastWriteTime = Date.now();
-}
-
-// ── Role keyword mapping ──
-
-export const ROLE_KEYWORDS: Record<string, string[]> = {
-  se: ["solutions engineer", "solutions consultant"],
-  fde: ["forward deployed engineer", "fde"],
-  presales: ["pre-sales", "presales", "sales engineer"],
-  tam: [
-    "technical account manager",
-    "customer engineer",
-  ],
-  impl: [
-    "implementation engineer",
-    "integration engineer",
-  ],
-  deployment: [
-    "deployment strategist",
-    "deployment engineer",
-  ],
-  cse: [
-    "customer success engineer",
-    "customer success manager",
-  ],
-};
-
-export const ROLE_LABELS: Record<string, string> = {
-  fde: "Forward Deployed Engineer",
-  se: "Solutions Engineer",
-  presales: "Pre-Sales / Sales Engineer",
-  tam: "Technical Account Manager",
-  impl: "Implementation Engineer",
-  deployment: "Deployment Strategist",
-  cse: "Customer Success Engineer",
-};
+// ROLE_KEYWORDS and ROLE_LABELS re-exported from ./constants
 
 // ── Job queries ──
 
@@ -290,7 +247,7 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
   jobs: Job[];
   total: number;
 }> {
-  const database = await getDb();
+  const database = getDb();
   const {
     roleTypes = [],
     country,
@@ -402,13 +359,13 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
 
   // Count query
   const countSql = `
-    SELECT COUNT(DISTINCT j.id)
+    SELECT COUNT(DISTINCT j.id) as cnt
     FROM jobs j
     LEFT JOIN company_enrichment ce ON ce.id = COALESCE(CASE WHEN j.ats_slug IS NOT NULL AND j.ats_slug != '' THEN (SELECT id FROM company_enrichment WHERE matched_slug = j.ats_slug LIMIT 1) END, (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1))
     WHERE ${whereClause}
   `;
-  const countResult = database.exec(countSql, bindParams);
-  const total = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+  const countRow = database.prepare(countSql).get(...bindParams) as { cnt: number } | undefined;
+  const total = countRow?.cnt ?? 0;
 
   // Data query
   const offset = (page - 1) * limit;
@@ -428,46 +385,25 @@ export async function getJobs(params: GetJobsParams = {}): Promise<{
     LIMIT ? OFFSET ?
   `;
 
-  const result = database.exec(dataSql, [...bindParams, limit, offset]);
-
-  const jobs: Job[] = [];
-  if (result.length > 0) {
-    const columns = result[0].columns;
-    for (const row of result[0].values) {
-      const job: Record<string, unknown> = {};
-      columns.forEach((col, i) => {
-        job[col] = row[i];
-      });
-      jobs.push(job as unknown as Job);
-    }
-  }
+  const jobs = database.prepare(dataSql).all(...bindParams, limit, offset) as Job[];
 
   return { jobs, total };
 }
 
 export async function getJobByUrl(url: string): Promise<Job | null> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  const row = database.prepare(
     `
     SELECT
       j.*, ce.funding_stage, ce.total_raised, ce.last_funded_date,
-      ce.employee_count, ce.industries, ce.description as enrichment_desc, ce.domain
+      ce.employee_count, ce.industries, ce.description as description, ce.domain
     FROM jobs j
     LEFT JOIN company_enrichment ce ON ce.id = COALESCE(CASE WHEN j.ats_slug IS NOT NULL AND j.ats_slug != '' THEN (SELECT id FROM company_enrichment WHERE matched_slug = j.ats_slug LIMIT 1) END, (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1))
     WHERE j.url = ?
-  `,
-    [url]
-  );
+  `
+  ).get(url) as Job | undefined;
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const row = result[0].values[0];
-  const job: Record<string, unknown> = {};
-  columns.forEach((col, i) => {
-    job[col === "enrichment_desc" ? "description" : col] = row[i];
-  });
-  return job as unknown as Job;
+  return row ?? null;
 }
 
 // ── Stats queries ──
@@ -477,39 +413,38 @@ export async function getJobStats(): Promise<{
   companies: number;
   sources: number;
 }> {
-  const database = await getDb();
+  const database = getDb();
 
-  const jobCount = database.exec(
-    "SELECT COUNT(*) FROM jobs WHERE status='open'"
-  );
-  const companyCount = database.exec(
-    "SELECT COUNT(DISTINCT company) FROM jobs WHERE status='open'"
-  );
-  const sourceCount = database.exec(
-    "SELECT COUNT(DISTINCT source) FROM jobs WHERE status='open'"
-  );
+  const jobCount = database.prepare(
+    "SELECT COUNT(*) as cnt FROM jobs WHERE status='open'"
+  ).get() as { cnt: number };
+  const companyCount = database.prepare(
+    "SELECT COUNT(DISTINCT company) as cnt FROM jobs WHERE status='open'"
+  ).get() as { cnt: number };
+  const sourceCount = database.prepare(
+    "SELECT COUNT(DISTINCT source) as cnt FROM jobs WHERE status='open'"
+  ).get() as { cnt: number };
 
   return {
-    openJobs: jobCount[0]?.values[0][0] as number,
-    companies: companyCount[0]?.values[0][0] as number,
-    sources: sourceCount[0]?.values[0][0] as number,
+    openJobs: jobCount.cnt,
+    companies: companyCount.cnt,
+    sources: sourceCount.cnt,
   };
 }
 
 export async function getJobCountsByRole(): Promise<
   Record<string, number>
 > {
-  const database = await getDb();
+  const database = getDb();
   const counts: Record<string, number> = {};
 
   for (const [roleKey, keywords] of Object.entries(ROLE_KEYWORDS)) {
     const kwClauses = keywords.map(() => "lower(title) LIKE ?").join(" OR ");
     const kwParams = keywords.map((kw) => `%${kw}%`);
-    const result = database.exec(
-      `SELECT COUNT(*) FROM jobs WHERE status='open' AND (${kwClauses})`,
-      kwParams
-    );
-    counts[roleKey] = result[0]?.values[0][0] as number;
+    const row = database.prepare(
+      `SELECT COUNT(*) as cnt FROM jobs WHERE status='open' AND (${kwClauses})`
+    ).get(...kwParams) as { cnt: number };
+    counts[roleKey] = row.cnt;
   }
 
   return counts;
@@ -518,8 +453,8 @@ export async function getJobCountsByRole(): Promise<
 // ── Homepage queries ──
 
 export async function getRecentJobs(limit: number = 6): Promise<Job[]> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     `
     SELECT
       j.id, j.title, j.company, j.location, j.url, j.source,
@@ -534,30 +469,16 @@ export async function getRecentJobs(limit: number = 6): Promise<Job[]> {
     WHERE j.status = 'open'
     ORDER BY COALESCE(j.posted_date, j.first_seen_at) DESC
     LIMIT ?
-  `,
-    [limit]
-  );
-
-  const jobs: Job[] = [];
-  if (result.length > 0) {
-    const columns = result[0].columns;
-    for (const row of result[0].values) {
-      const job: Record<string, unknown> = {};
-      columns.forEach((col, i) => {
-        job[col] = row[i];
-      });
-      jobs.push(job as unknown as Job);
-    }
-  }
-  return jobs;
+  `
+  ).all(limit) as Job[];
 }
 
 // To feature a role, run:
 // UPDATE jobs SET featured=1 WHERE url='...';
 // (Admin UI for this coming in Phase 2)
 export async function getFeaturedJobs(): Promise<Job[]> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     `
     SELECT
       j.id, j.title, j.company, j.location, j.url, j.source,
@@ -573,20 +494,7 @@ export async function getFeaturedJobs(): Promise<Job[]> {
     ORDER BY COALESCE(j.posted_date, j.first_seen_at) DESC
     LIMIT 4
   `
-  );
-
-  const jobs: Job[] = [];
-  if (result.length > 0) {
-    const columns = result[0].columns;
-    for (const row of result[0].values) {
-      const job: Record<string, unknown> = {};
-      columns.forEach((col, i) => {
-        job[col] = row[i];
-      });
-      jobs.push(job as unknown as Job);
-    }
-  }
-  return jobs;
+  ).all() as Job[];
 }
 
 // ── Company list query ──
@@ -594,16 +502,10 @@ export async function getFeaturedJobs(): Promise<Job[]> {
 export async function getCompanies(): Promise<
   { company: string; count: number }[]
 > {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     "SELECT company, COUNT(*) as count FROM jobs WHERE status='open' GROUP BY company ORDER BY count DESC"
-  );
-
-  if (result.length === 0) return [];
-  return result[0].values.map((row) => ({
-    company: row[0] as string,
-    count: row[1] as number,
-  }));
+  ).all() as { company: string; count: number }[];
 }
 
 // ── Candidate queries ──
@@ -650,30 +552,26 @@ export async function upsertCandidate(
   location?: string,
   surname?: string
 ): Promise<Candidate & { isNew: boolean }> {
-  const database = await getDb();
+  const database = getDb();
   const roleTypesJson = JSON.stringify(roleTypes);
 
   // Try update first
-  const existing = database.exec(
-    "SELECT id FROM candidates WHERE email = ?",
-    [email]
-  );
+  const existing = database.prepare(
+    "SELECT id FROM candidates WHERE email = ?"
+  ).get(email);
 
-  const isNew = !(existing.length > 0 && existing[0].values.length > 0);
+  const isNew = !existing;
 
   if (!isNew) {
-    database.run(
-      "UPDATE candidates SET name = ?, surname = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), location = COALESCE(?, location), last_active_at = datetime('now') WHERE email = ?",
-      [name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null, email]
-    );
+    database.prepare(
+      "UPDATE candidates SET name = ?, surname = ?, role_types = ?, linkedin_url = COALESCE(?, linkedin_url), cv_filename = COALESCE(?, cv_filename), cv_path = COALESCE(?, cv_path), location = COALESCE(?, location), last_active_at = datetime('now') WHERE email = ?"
+    ).run(name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null, email);
   } else {
-    database.run(
-      "INSERT INTO candidates (email, name, surname, role_types, linkedin_url, cv_filename, cv_path, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [email, name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null]
-    );
+    database.prepare(
+      "INSERT INTO candidates (email, name, surname, role_types, linkedin_url, cv_filename, cv_path, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(email, name, surname || null, roleTypesJson, linkedinUrl || null, cvFilename || null, cvPath || null, location || null);
   }
 
-  forceSave();
   const candidate = await getCandidateByEmail(email) as Candidate;
   return { ...candidate, isNew };
 }
@@ -681,37 +579,17 @@ export async function upsertCandidate(
 export async function getCandidateByEmail(
   email: string
 ): Promise<Candidate | null> {
-  const database = await getDb();
-  const result = database.exec("SELECT * FROM candidates WHERE email = ?", [
-    email,
-  ]);
-
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const row = result[0].values[0];
-  const candidate: Record<string, unknown> = {};
-  columns.forEach((col, i) => {
-    candidate[col] = row[i];
-  });
-  return candidate as unknown as Candidate;
+  const database = getDb();
+  const row = database.prepare("SELECT * FROM candidates WHERE email = ?").get(email) as Candidate | undefined;
+  return row ?? null;
 }
 
 export async function getCandidateById(
   id: number
 ): Promise<Candidate | null> {
-  const database = await getDb();
-  const result = database.exec("SELECT * FROM candidates WHERE id = ?", [id]);
-
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const row = result[0].values[0];
-  const candidate: Record<string, unknown> = {};
-  columns.forEach((col, i) => {
-    candidate[col] = row[i];
-  });
-  return candidate as unknown as Candidate;
+  const database = getDb();
+  const row = database.prepare("SELECT * FROM candidates WHERE id = ?").get(id) as Candidate | undefined;
+  return row ?? null;
 }
 
 export async function setVerificationToken(
@@ -719,40 +597,26 @@ export async function setVerificationToken(
   token: string,
   expiresAt: string
 ): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "UPDATE candidates SET verification_token = ?, token_expires_at = ? WHERE id = ?",
-    [token, expiresAt, candidateId]
-  );
-  forceSave();
+  const database = getDb();
+  database.prepare(
+    "UPDATE candidates SET verification_token = ?, token_expires_at = ? WHERE id = ?"
+  ).run(token, expiresAt, candidateId);
 }
 
 export async function verifyCandidate(token: string): Promise<Candidate | null> {
-  const database = await getDb();
-  const result = database.exec(
-    "SELECT * FROM candidates WHERE verification_token = ? AND token_expires_at > datetime('now')",
-    [token]
-  );
+  const database = getDb();
+  const row = database.prepare(
+    "SELECT * FROM candidates WHERE verification_token = ? AND token_expires_at > datetime('now')"
+  ).get(token) as Candidate | undefined;
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const row = result[0].values[0];
-  const candidate: Record<string, unknown> = {};
-  columns.forEach((col, i) => {
-    candidate[col] = row[i];
-  });
-
-  const c = candidate as unknown as Candidate;
+  if (!row) return null;
 
   // Mark as verified and clear token
-  database.run(
-    "UPDATE candidates SET verified = 1, verification_token = NULL, token_expires_at = NULL, last_active_at = datetime('now') WHERE id = ?",
-    [c.id]
-  );
-  forceSave();
+  database.prepare(
+    "UPDATE candidates SET verified = 1, verification_token = NULL, token_expires_at = NULL, last_active_at = datetime('now') WHERE id = ?"
+  ).run(row.id);
 
-  return { ...c, verified: 1 };
+  return { ...row, verified: 1 };
 }
 
 export async function updateCandidate(
@@ -781,7 +645,7 @@ export async function updateCandidate(
     cv_path?: string;
   }
 ): Promise<void> {
-  const database = await getDb();
+  const database = getDb();
   const sets: string[] = [];
   const params: (string | number)[] = [];
 
@@ -812,24 +676,21 @@ export async function updateCandidate(
 
   sets.push("last_active_at = datetime('now')");
   params.push(id);
-  database.run(`UPDATE candidates SET ${sets.join(", ")} WHERE id = ?`, params);
-  forceSave();
+  database.prepare(`UPDATE candidates SET ${sets.join(", ")} WHERE id = ?`).run(...params);
 }
 
 export async function deleteCandidate(id: number): Promise<void> {
-  const database = await getDb();
-  database.run("DELETE FROM candidate_saved_jobs WHERE candidate_id = ?", [id]);
-  database.run("DELETE FROM candidates WHERE id = ?", [id]);
-  forceSave();
+  const database = getDb();
+  database.prepare("DELETE FROM candidate_saved_jobs WHERE candidate_id = ?").run(id);
+  database.prepare("DELETE FROM candidates WHERE id = ?").run(id);
 }
 
 export async function getSavedJobCount(candidateId: number): Promise<number> {
-  const database = await getDb();
-  const result = database.exec(
-    "SELECT COUNT(*) FROM candidate_saved_jobs WHERE candidate_id = ?",
-    [candidateId]
-  );
-  return result.length > 0 ? (result[0].values[0][0] as number) : 0;
+  const database = getDb();
+  const row = database.prepare(
+    "SELECT COUNT(*) as cnt FROM candidate_saved_jobs WHERE candidate_id = ?"
+  ).get(candidateId) as { cnt: number };
+  return row.cnt;
 }
 
 // ── Saved jobs ──
@@ -837,43 +698,36 @@ export async function getSavedJobCount(candidateId: number): Promise<number> {
 export async function getSavedJobUrls(
   candidateId: number
 ): Promise<string[]> {
-  const database = await getDb();
-  const result = database.exec(
-    "SELECT job_url FROM candidate_saved_jobs WHERE candidate_id = ? ORDER BY saved_at DESC",
-    [candidateId]
-  );
-
-  if (result.length === 0) return [];
-  return result[0].values.map((row) => row[0] as string);
+  const database = getDb();
+  const rows = database.prepare(
+    "SELECT job_url FROM candidate_saved_jobs WHERE candidate_id = ? ORDER BY saved_at DESC"
+  ).all(candidateId) as { job_url: string }[];
+  return rows.map((r) => r.job_url);
 }
 
 export async function saveJob(
   candidateId: number,
   jobUrl: string
 ): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "INSERT OR IGNORE INTO candidate_saved_jobs (candidate_id, job_url) VALUES (?, ?)",
-    [candidateId, jobUrl]
-  );
-  forceSave();
+  const database = getDb();
+  database.prepare(
+    "INSERT OR IGNORE INTO candidate_saved_jobs (candidate_id, job_url) VALUES (?, ?)"
+  ).run(candidateId, jobUrl);
 }
 
 export async function unsaveJob(
   candidateId: number,
   jobUrl: string
 ): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "DELETE FROM candidate_saved_jobs WHERE candidate_id = ? AND job_url = ?",
-    [candidateId, jobUrl]
-  );
-  forceSave();
+  const database = getDb();
+  database.prepare(
+    "DELETE FROM candidate_saved_jobs WHERE candidate_id = ? AND job_url = ?"
+  ).run(candidateId, jobUrl);
 }
 
 export async function getSavedJobs(candidateId: number): Promise<Job[]> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     `
     SELECT
       j.id, j.title, j.company, j.location, j.url, j.source,
@@ -888,23 +742,8 @@ export async function getSavedJobs(candidateId: number): Promise<Job[]> {
     LEFT JOIN company_enrichment ce ON ce.id = COALESCE(CASE WHEN j.ats_slug IS NOT NULL AND j.ats_slug != '' THEN (SELECT id FROM company_enrichment WHERE matched_slug = j.ats_slug LIMIT 1) END, (SELECT id FROM company_enrichment WHERE lower(company_name) = lower(j.company) LIMIT 1))
     WHERE csj.candidate_id = ?
     ORDER BY csj.saved_at DESC
-  `,
-    [candidateId]
-  );
-
-  const jobs: Job[] = [];
-  if (result.length > 0) {
-    const columns = result[0].columns;
-    for (const row of result[0].values) {
-      const job: Record<string, unknown> = {};
-      columns.forEach((col, i) => {
-        job[col] = row[i];
-      });
-      jobs.push(job as unknown as Job);
-    }
-  }
-
-  return jobs;
+  `
+  ).all(candidateId) as Job[];
 }
 
 // ── Employer queries ──
@@ -935,39 +774,28 @@ export interface EmployerSubmission {
   employer_company?: string;
 }
 
-function rowToObject(columns: string[], row: unknown[]): Record<string, unknown> {
-  const obj: Record<string, unknown> = {};
-  columns.forEach((col, i) => { obj[col] = row[i]; });
-  return obj;
-}
-
 export async function createEmployer(
   name: string,
   email: string,
   company_name: string
 ): Promise<number> {
-  const database = await getDb();
-  database.run(
-    "INSERT INTO employers (name, email, company_name) VALUES (?, ?, ?)",
-    [name, email.toLowerCase().trim(), company_name]
-  );
-  const result = database.exec("SELECT last_insert_rowid()");
-  forceSave();
-  return result[0].values[0][0] as number;
+  const database = getDb();
+  const result = database.prepare(
+    "INSERT INTO employers (name, email, company_name) VALUES (?, ?, ?)"
+  ).run(name, email.toLowerCase().trim(), company_name);
+  return Number(result.lastInsertRowid);
 }
 
 export async function getEmployerByEmail(email: string): Promise<Employer | null> {
-  const database = await getDb();
-  const result = database.exec("SELECT * FROM employers WHERE email = ?", [email.toLowerCase().trim()]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  return rowToObject(result[0].columns, result[0].values[0]) as unknown as Employer;
+  const database = getDb();
+  const row = database.prepare("SELECT * FROM employers WHERE email = ?").get(email.toLowerCase().trim()) as Employer | undefined;
+  return row ?? null;
 }
 
 export async function getEmployerById(id: number): Promise<Employer | null> {
-  const database = await getDb();
-  const result = database.exec("SELECT * FROM employers WHERE id = ?", [id]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  return rowToObject(result[0].columns, result[0].values[0]) as unknown as Employer;
+  const database = getDb();
+  const row = database.prepare("SELECT * FROM employers WHERE id = ?").get(id) as Employer | undefined;
+  return row ?? null;
 }
 
 export async function createEmployerSession(
@@ -975,30 +803,25 @@ export async function createEmployerSession(
   token: string,
   expires_at: string
 ): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "INSERT INTO employer_sessions (employer_id, token, expires_at) VALUES (?, ?, ?)",
-    [employer_id, token, expires_at]
-  );
-  forceSave();
+  const database = getDb();
+  database.prepare(
+    "INSERT INTO employer_sessions (employer_id, token, expires_at) VALUES (?, ?, ?)"
+  ).run(employer_id, token, expires_at);
 }
 
 export async function getEmployerBySessionToken(token: string): Promise<Employer | null> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  const row = database.prepare(
     `SELECT e.* FROM employers e
      JOIN employer_sessions es ON es.employer_id = e.id
-     WHERE es.token = ? AND es.expires_at > datetime('now')`,
-    [token]
-  );
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  return rowToObject(result[0].columns, result[0].values[0]) as unknown as Employer;
+     WHERE es.token = ? AND es.expires_at > datetime('now')`
+  ).get(token) as Employer | undefined;
+  return row ?? null;
 }
 
 export async function deleteEmployerSession(token: string): Promise<void> {
-  const database = await getDb();
-  database.run("DELETE FROM employer_sessions WHERE token = ?", [token]);
-  forceSave();
+  const database = getDb();
+  database.prepare("DELETE FROM employer_sessions WHERE token = ?").run(token);
 }
 
 export async function createEmployerSubmission(
@@ -1010,43 +833,34 @@ export async function createEmployerSubmission(
   scraped_description: string | null,
   job_id?: number | null
 ): Promise<number> {
-  const database = await getDb();
-  database.run(
+  const database = getDb();
+  const result = database.prepare(
     `INSERT INTO employer_submitted_jobs (employer_id, job_url, job_id, scraped_title, scraped_company, scraped_location, scraped_description)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [employer_id, job_url, job_id ?? null, scraped_title, scraped_company, scraped_location, scraped_description]
-  );
-  const result = database.exec("SELECT last_insert_rowid()");
-  forceSave();
-  return result[0].values[0][0] as number;
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(employer_id, job_url, job_id ?? null, scraped_title, scraped_company, scraped_location, scraped_description);
+  return Number(result.lastInsertRowid);
 }
 
 export async function getEmployerSubmissions(employer_id: number): Promise<EmployerSubmission[]> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     `SELECT esj.*, COALESCE(j.verified, 0) as verified
      FROM employer_submitted_jobs esj
      LEFT JOIN jobs j ON esj.job_id = j.id
      WHERE esj.employer_id = ?
-     ORDER BY esj.submitted_at DESC`,
-    [employer_id]
-  );
-  if (result.length === 0) return [];
-  return result[0].values.map(row =>
-    rowToObject(result[0].columns, row) as unknown as EmployerSubmission
-  );
+     ORDER BY esj.submitted_at DESC`
+  ).all(employer_id) as EmployerSubmission[];
 }
 
 export async function getEmployerSubmissionById(id: number): Promise<EmployerSubmission | null> {
-  const database = await getDb();
-  const result = database.exec("SELECT * FROM employer_submitted_jobs WHERE id = ?", [id]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  return rowToObject(result[0].columns, result[0].values[0]) as unknown as EmployerSubmission;
+  const database = getDb();
+  const row = database.prepare("SELECT * FROM employer_submitted_jobs WHERE id = ?").get(id) as EmployerSubmission | undefined;
+  return row ?? null;
 }
 
 export async function getAllPendingSubmissions(): Promise<EmployerSubmission[]> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     `SELECT esj.*, e.name as employer_name, e.company_name as employer_company
      FROM employer_submitted_jobs esj
      JOIN employers e ON esj.employer_id = e.id
@@ -1054,44 +868,31 @@ export async function getAllPendingSubmissions(): Promise<EmployerSubmission[]> 
        CASE WHEN esj.status = 'pending' THEN 0 ELSE 1 END ASC,
        CASE WHEN esj.status = 'pending' THEN esj.submitted_at ELSE esj.reviewed_at END DESC
      LIMIT 100`
-  );
-  if (result.length === 0) return [];
-  return result[0].values.map(row =>
-    rowToObject(result[0].columns, row) as unknown as EmployerSubmission
-  );
+  ).all() as EmployerSubmission[];
 }
 
 export async function updateSubmissionJobId(submissionId: number, jobId: number): Promise<void> {
-  const database = await getDb();
-  database.run("UPDATE employer_submitted_jobs SET job_id = ? WHERE id = ?", [jobId, submissionId]);
-  forceSave();
+  const database = getDb();
+  database.prepare("UPDATE employer_submitted_jobs SET job_id = ? WHERE id = ?").run(jobId, submissionId);
 }
 
 export async function approveSubmission(id: number): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "UPDATE employer_submitted_jobs SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?",
-    [id]
-  );
+  const database = getDb();
+  database.prepare(
+    "UPDATE employer_submitted_jobs SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?"
+  ).run(id);
   // If job_id exists, set verified and employer_id on the job
-  const sub = database.exec("SELECT job_id, employer_id FROM employer_submitted_jobs WHERE id = ?", [id]);
-  if (sub.length > 0 && sub[0].values.length > 0) {
-    const jobId = sub[0].values[0][0] as number | null;
-    const employerId = sub[0].values[0][1] as number;
-    if (jobId) {
-      database.run("UPDATE jobs SET verified = 1, employer_id = ? WHERE id = ?", [employerId, jobId]);
-    }
+  const sub = database.prepare("SELECT job_id, employer_id FROM employer_submitted_jobs WHERE id = ?").get(id) as { job_id: number | null; employer_id: number } | undefined;
+  if (sub?.job_id) {
+    database.prepare("UPDATE jobs SET verified = 1, employer_id = ? WHERE id = ?").run(sub.employer_id, sub.job_id);
   }
-  forceSave();
 }
 
 export async function rejectSubmission(id: number, reason?: string): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "UPDATE employer_submitted_jobs SET status = 'rejected', reviewed_at = datetime('now'), rejection_reason = ? WHERE id = ?",
-    [reason || null, id]
-  );
-  forceSave();
+  const database = getDb();
+  database.prepare(
+    "UPDATE employer_submitted_jobs SET status = 'rejected', reviewed_at = datetime('now'), rejection_reason = ? WHERE id = ?"
+  ).run(reason || null, id);
 }
 
 export async function getOrCreateJobFromUrl(
@@ -1101,29 +902,26 @@ export async function getOrCreateJobFromUrl(
   scraped_location: string | null,
   scraped_description: string | null
 ): Promise<{ job_id: number; was_duplicate: boolean }> {
-  const database = await getDb();
+  const database = getDb();
 
   // Check if job URL already exists
-  const existing = database.exec("SELECT id FROM jobs WHERE url = ?", [url]);
-  if (existing.length > 0 && existing[0].values.length > 0) {
-    return { job_id: existing[0].values[0][0] as number, was_duplicate: true };
+  const existing = database.prepare("SELECT id FROM jobs WHERE url = ?").get(url) as { id: number } | undefined;
+  if (existing) {
+    return { job_id: existing.id, was_duplicate: true };
   }
 
   // Create new job with status='open'
-  database.run(
+  const result = database.prepare(
     `INSERT INTO jobs (title, company, location, url, status, description_snippet, first_seen_at)
-     VALUES (?, ?, ?, ?, 'open', ?, datetime('now'))`,
-    [
-      scraped_title || "Untitled Role",
-      scraped_company || "Unknown Company",
-      scraped_location || null,
-      url,
-      scraped_description ? scraped_description.slice(0, 500) : null,
-    ]
+     VALUES (?, ?, ?, ?, 'open', ?, datetime('now'))`
+  ).run(
+    scraped_title || "Untitled Role",
+    scraped_company || "Unknown Company",
+    scraped_location || null,
+    url,
+    scraped_description ? scraped_description.slice(0, 500) : null,
   );
-  const result = database.exec("SELECT last_insert_rowid()");
-  forceSave();
-  return { job_id: result[0].values[0][0] as number, was_duplicate: false };
+  return { job_id: Number(result.lastInsertRowid), was_duplicate: false };
 }
 
 // ── Admin job management ──
@@ -1135,7 +933,7 @@ export async function adminSearchJobs(params: {
   page: number;
   limit: number;
 }): Promise<{ jobs: Record<string, unknown>[]; total: number }> {
-  const database = await getDb();
+  const database = getDb();
   const conditions: string[] = [];
   const bindParams: (string | number)[] = [];
 
@@ -1157,29 +955,19 @@ export async function adminSearchJobs(params: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const countResult = database.exec(
-    `SELECT COUNT(*) FROM jobs ${whereClause}`,
-    bindParams
-  );
-  const total = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+  const countRow = database.prepare(
+    `SELECT COUNT(*) as cnt FROM jobs ${whereClause}`
+  ).get(...bindParams) as { cnt: number };
+  const total = countRow.cnt;
 
   const offset = (params.page - 1) * params.limit;
-  const dataResult = database.exec(
+  const jobs = database.prepare(
     `SELECT id, title, company, location, url AS job_url, source, status, posted_date, first_seen_at,
             salary_range, country
      FROM jobs ${whereClause}
      ORDER BY first_seen_at DESC
-     LIMIT ? OFFSET ?`,
-    [...bindParams, params.limit, offset]
-  );
-
-  const jobs: Record<string, unknown>[] = [];
-  if (dataResult.length > 0) {
-    const columns = dataResult[0].columns;
-    for (const row of dataResult[0].values) {
-      jobs.push(rowToObject(columns, row));
-    }
-  }
+     LIMIT ? OFFSET ?`
+  ).all(...bindParams, params.limit, offset) as Record<string, unknown>[];
 
   return { jobs, total };
 }
@@ -1196,7 +984,7 @@ export async function updateJob(
     posted_date: string | null;
   }>
 ): Promise<void> {
-  const database = await getDb();
+  const database = getDb();
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
 
@@ -1211,18 +999,16 @@ export async function updateJob(
   if (sets.length === 0) return;
 
   params.push(id);
-  database.run(`UPDATE jobs SET ${sets.join(", ")} WHERE id = ?`, params);
-  forceSave();
+  database.prepare(`UPDATE jobs SET ${sets.join(", ")} WHERE id = ?`).run(...params);
 }
 
 export async function deleteJob(id: number, hard?: boolean): Promise<void> {
-  const database = await getDb();
+  const database = getDb();
   if (hard) {
-    database.run("DELETE FROM jobs WHERE id = ?", [id]);
+    database.prepare("DELETE FROM jobs WHERE id = ?").run(id);
   } else {
-    database.run("UPDATE jobs SET status = ? WHERE id = ?", ["closed", id]);
+    database.prepare("UPDATE jobs SET status = ? WHERE id = ?").run("closed", id);
   }
-  forceSave();
 }
 
 // ── Admin candidate search ──
@@ -1235,7 +1021,7 @@ export async function adminSearchCandidates(params: {
   page: number;
   limit: number;
 }): Promise<{ candidates: Record<string, unknown>[]; total: number }> {
-  const database = await getDb();
+  const database = getDb();
   const conditions: string[] = [];
   const bindParams: (string | number)[] = [];
 
@@ -1259,25 +1045,15 @@ export async function adminSearchCandidates(params: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const countResult = database.exec(
-    `SELECT COUNT(*) FROM candidates ${whereClause}`,
-    bindParams
-  );
-  const total = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+  const countRow = database.prepare(
+    `SELECT COUNT(*) as cnt FROM candidates ${whereClause}`
+  ).get(...bindParams) as { cnt: number };
+  const total = countRow.cnt;
 
   const offset = (params.page - 1) * params.limit;
-  const dataResult = database.exec(
-    `SELECT * FROM candidates ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    [...bindParams, params.limit, offset]
-  );
-
-  const candidates: Record<string, unknown>[] = [];
-  if (dataResult.length > 0) {
-    const columns = dataResult[0].columns;
-    for (const row of dataResult[0].values) {
-      candidates.push(rowToObject(columns, row));
-    }
-  }
+  const candidates = database.prepare(
+    `SELECT * FROM candidates ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+  ).all(...bindParams, params.limit, offset) as Record<string, unknown>[];
 
   return { candidates, total };
 }
@@ -1289,32 +1065,27 @@ export async function createAdminTokenRecord(
   email: string,
   expiresAt: string
 ): Promise<void> {
-  const database = await getDb();
-  database.run(
-    "INSERT INTO admin_tokens (token_hash, email, expires_at) VALUES (?, ?, ?)",
-    [tokenHash, email, expiresAt]
-  );
-  forceSave();
+  const database = getDb();
+  database.prepare(
+    "INSERT INTO admin_tokens (token_hash, email, expires_at) VALUES (?, ?, ?)"
+  ).run(tokenHash, email, expiresAt);
 }
 
 export async function consumeAdminToken(
   tokenHash: string
 ): Promise<{ email: string } | null> {
-  const database = await getDb();
-  const result = database.exec(
-    "SELECT email FROM admin_tokens WHERE token_hash = ? AND used = 0 AND expires_at > datetime('now')",
-    [tokenHash]
-  );
+  const database = getDb();
+  const row = database.prepare(
+    "SELECT email FROM admin_tokens WHERE token_hash = ? AND used = 0 AND expires_at > datetime('now')"
+  ).get(tokenHash) as { email: string } | undefined;
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
+  if (!row) return null;
 
-  database.run(
-    "UPDATE admin_tokens SET used = 1 WHERE token_hash = ?",
-    [tokenHash]
-  );
-  forceSave();
+  database.prepare(
+    "UPDATE admin_tokens SET used = 1 WHERE token_hash = ?"
+  ).run(tokenHash);
 
-  return { email: result[0].values[0][0] as string };
+  return { email: row.email };
 }
 
 // ── Signal queries ──
@@ -1342,72 +1113,69 @@ export interface Signal {
 export async function upsertSignals(
   signals: Partial<Signal>[]
 ): Promise<{ inserted: number; updated: number }> {
-  const database = await getDb();
+  const database = getDb();
   let inserted = 0;
   let updated = 0;
 
-  for (const s of signals) {
-    const existing = database.exec(
-      "SELECT id FROM signals WHERE tweet_id = ?",
-      [s.tweet_id ?? null]
-    );
+  const insertStmt = database.prepare(
+    `INSERT INTO signals (
+      tweet_id, author_username, author_name, author_followers,
+      text, created_at, url, matched_query, score, account_type,
+      company_name, role_extracted, ai_reasoning, is_target_stage, discovered_at, published
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
 
-    if (existing.length > 0 && existing[0].values.length > 0) {
-      database.run(
-        `UPDATE signals SET
-          author_username = ?, author_name = ?, author_followers = ?,
-          text = ?, created_at = ?, url = ?, matched_query = ?,
-          score = ?, account_type = ?, company_name = ?,
-          role_extracted = ?, ai_reasoning = ?, is_target_stage = ?,
-          discovered_at = ?, published = ?
-        WHERE tweet_id = ?`,
-        [
+  const updateStmt = database.prepare(
+    `UPDATE signals SET
+      author_username = ?, author_name = ?, author_followers = ?,
+      text = ?, created_at = ?, url = ?, matched_query = ?,
+      score = ?, account_type = ?, company_name = ?,
+      role_extracted = ?, ai_reasoning = ?, is_target_stage = ?,
+      discovered_at = ?, published = ?
+    WHERE tweet_id = ?`
+  );
+
+  const checkStmt = database.prepare("SELECT id FROM signals WHERE tweet_id = ?");
+
+  const upsertAll = database.transaction((items: Partial<Signal>[]) => {
+    for (const s of items) {
+      const existing = checkStmt.get(s.tweet_id ?? null);
+
+      if (existing) {
+        updateStmt.run(
           s.author_username ?? null, s.author_name ?? null, s.author_followers ?? null,
           s.text ?? null, s.created_at ?? null, s.url ?? null, s.matched_query ?? null,
           s.score ?? null, s.account_type ?? null, s.company_name ?? null,
           s.role_extracted ?? null, s.ai_reasoning ?? null, s.is_target_stage ?? null,
           s.discovered_at ?? null, s.published ?? 1, s.tweet_id ?? null,
-        ]
-      );
-      updated++;
-    } else {
-      database.run(
-        `INSERT INTO signals (
-          tweet_id, author_username, author_name, author_followers,
-          text, created_at, url, matched_query, score, account_type,
-          company_name, role_extracted, ai_reasoning, is_target_stage, discovered_at, published
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
+        );
+        updated++;
+      } else {
+        insertStmt.run(
           s.tweet_id ?? null, s.author_username ?? null, s.author_name ?? null,
           s.author_followers ?? null, s.text ?? null, s.created_at ?? null,
           s.url ?? null, s.matched_query ?? null, s.score ?? null,
           s.account_type ?? null, s.company_name ?? null, s.role_extracted ?? null,
           s.ai_reasoning ?? null, s.is_target_stage ?? null, s.discovered_at ?? null,
           s.published ?? 1,
-        ]
-      );
-      inserted++;
+        );
+        inserted++;
+      }
     }
-  }
+  });
 
-  forceSave();
+  upsertAll(signals);
   return { inserted, updated };
 }
 
 export async function getSignalsFeed(limit: number = 20): Promise<Signal[]> {
-  const database = await getDb();
-  const result = database.exec(
+  const database = getDb();
+  return database.prepare(
     `SELECT * FROM signals
      WHERE published = 1
      ORDER BY score DESC, discovered_at DESC
-     LIMIT ?`,
-    [limit]
-  );
-
-  if (result.length === 0) return [];
-  return result[0].values.map(
-    (row) => rowToObject(result[0].columns, row) as unknown as Signal
-  );
+     LIMIT ?`
+  ).all(limit) as Signal[];
 }
 
 export interface CompanyInsight {
@@ -1428,22 +1196,20 @@ export async function getCompanyInsights(
   name: string,
   linkedinSlug?: string
 ): Promise<CompanyInsight | null> {
-  const database = await getDb();
+  const database = getDb();
 
   // Strategy 0: LinkedIn company slug match (most reliable — from /company/slug/ URL)
   if (linkedinSlug && linkedinSlug.length >= 2) {
     const slugNorm = linkedinSlug.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const result = database.exec(
+    const row = database.prepare(
       `SELECT company_name, funding_stage, yc_batch, total_raised, last_raised, last_funded_date,
               industries, hq_location, investors, description
        FROM company_enrichment
        WHERE REPLACE(REPLACE(LOWER(COALESCE(matched_slug, domain, '')), '-', ''), '.', '') = ?
           OR REPLACE(REPLACE(LOWER(COALESCE(domain, '')), '-', ''), '.', '') LIKE ?
-       LIMIT 1`,
-      [slugNorm, `${slugNorm}%`]
-    );
-    if (result.length > 0 && result[0].values.length > 0) {
-      const row = rowToObject(result[0].columns, result[0].values[0]);
+       LIMIT 1`
+    ).get(slugNorm, `${slugNorm}%`) as Record<string, unknown> | undefined;
+    if (row) {
       return {
         found: true,
         company_name: row.company_name as string,
@@ -1463,17 +1229,16 @@ export async function getCompanyInsights(
   if (!name) return null;
 
   // Strategy 1: Exact match (case insensitive)
-  let result = database.exec(
+  let row = database.prepare(
     `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
             industries, hq_location, investors, description
      FROM company_enrichment
      WHERE LOWER(TRIM(company_name)) = LOWER(TRIM(?))
-     LIMIT 1`,
-    [name]
-  );
+     LIMIT 1`
+  ).get(name) as Record<string, unknown> | undefined;
 
   // Strategy 2: Suffix-stripped exact match ("Anthropic, Inc." → "Anthropic")
-  if (result.length === 0) {
+  if (!row) {
     const normalize = (s: string) =>
       s
         .toLowerCase()
@@ -1487,7 +1252,7 @@ export async function getCompanyInsights(
 
     const normalizedName = normalize(name);
     if (normalizedName) {
-      result = database.exec(
+      row = database.prepare(
         `SELECT company_name, funding_stage, total_raised, last_raised, last_funded_date,
                 industries, hq_location, investors, description
          FROM company_enrichment
@@ -1496,15 +1261,13 @@ export async function getCompanyInsights(
                  ',', ' '), '.', ' '), '''', ''), '!', ''), '&', ' '), '-', ' '), '(', ''), ')', ''),
                  'inc', ''), 'ltd', ''))
                = ?
-         LIMIT 1`,
-        [normalizedName]
-      );
+         LIMIT 1`
+      ).get(normalizedName) as Record<string, unknown> | undefined;
     }
   }
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
+  if (!row) return null;
 
-  const row = rowToObject(result[0].columns, result[0].values[0]);
   return {
     found: true,
     company_name: row.company_name as string,
