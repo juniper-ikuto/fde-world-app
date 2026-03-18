@@ -190,6 +190,28 @@ function getDb(): Database.Database {
   // Migration: add published column if not present (for existing DBs)
   try { db.exec(`ALTER TABLE signals ADD COLUMN published INTEGER DEFAULT 1`); } catch { /* */ }
 
+  // ── Performance indexes ──
+  // These make the correlated subquery JOIN on company_enrichment fast
+  // (without them every row triggers a full table scan on company_enrichment)
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_ce_matched_slug
+      ON company_enrichment(matched_slug);
+    CREATE INDEX IF NOT EXISTS idx_ce_company_name_lower
+      ON company_enrichment(lower(company_name));
+    CREATE INDEX IF NOT EXISTS idx_jobs_status
+      ON jobs(status);
+    CREATE INDEX IF NOT EXISTS idx_jobs_ats_slug
+      ON jobs(ats_slug);
+    CREATE INDEX IF NOT EXISTS idx_jobs_posted_date
+      ON jobs(posted_date);
+    CREATE INDEX IF NOT EXISTS idx_jobs_first_seen_at
+      ON jobs(first_seen_at);
+    CREATE INDEX IF NOT EXISTS idx_jobs_country
+      ON jobs(country);
+    CREATE INDEX IF NOT EXISTS idx_jobs_company
+      ON jobs(lower(company));
+  `);
+
   return db;
 }
 
